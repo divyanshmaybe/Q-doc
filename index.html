@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Q-Doc — A basic checkup, in your own language, without the wait.</title>
+  <meta name="description" content="Q-Doc builds AI-powered health screening kiosks for government hospitals and public spaces across India. One visit, one conversation, in the patient's own language — screening and answer in the same sitting. No appointment. No queue.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f4f7f6;
+      --ink: #0a1f1d;
+      --accent: #f2994a;
+      --teal: #2dd4bf;
+      --muted: #5b6b68;
+      --border: #d8e0de;
+      --panel-bg: #ffffff;
+      --strip-bg: #eef3f1;
+      --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-head: 'Poppins', system-ui, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d211e;
+        --ink: #e3eceb;
+        --muted: #7da09a;
+        --border: #1b3330;
+        --panel-bg: #112d28;
+        --strip-bg: #0f2722;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding-top: env(safe-area-inset-top);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+    }
+
+    h1, h2, h3 { font-family: var(--font-head); line-height: 1.2; letter-spacing: -0.015em; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+    /* BRAND ROW */
+    .brand-row { border-bottom: 1px solid var(--border); padding: 18px 0; }
+    .brand-inner { display: flex; align-items: center; gap: 11px; }
+    .logo-mark { width: 34px; height: 34px; flex-shrink: 0; }
+    .wordmark {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    /* HERO */
+    .hero { padding: 72px 0 80px; border-bottom: 1px solid var(--border); }
+    .hero-inner {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      align-items: center;
+      gap: 52px;
+    }
+    .hero-text h1 {
+      font-size: clamp(2.05rem, 3.6vw, 3.1rem);
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 20px;
+      line-height: 1.13;
+    }
+    .hero-text h1 em { font-style: normal; color: var(--accent); }
+    .hero-subtext {
+      font-size: 1.0625rem;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.76;
+      margin-bottom: 32px;
+    }
+    .hero-subtext p + p { margin-top: 14px; }
+    .cta-btn {
+      display: inline-block;
+      padding: 11px 26px;
+      background-color: var(--accent);
+      color: #fff;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: .9375rem;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-bottom: 48px;
+      transition: background-color .15s ease, box-shadow .15s ease;
+    }
+    .cta-btn:hover { background-color: #e0823a; box-shadow: 0 2px 14px rgba(242,153,74,.28); }
+
+    .stats-row { display: flex; gap: 36px; flex-wrap: wrap; }
+    .stat-item { border-left: 3px solid var(--teal); padding-left: 14px; }
+    .stat-number {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 1.45rem;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+    .stat-label { font-size: .8125rem; color: var(--muted); line-height: 1.48; max-width: 188px; }
+
+    .hero-svg-wrap { width: 100%; max-width: 400px; }
+    .hero-svg-wrap svg { width: 100%; height: auto; display: block; }
+
+    /* SHARED SECTION */
+    .section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+
+    /* PROBLEM */
+    .split-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .panel { padding: 40px 36px; background-color: var(--panel-bg); }
+    .panel:first-child { border-right: 1px solid var(--border); }
+    .panel-eyebrow {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 16px;
+      letter-spacing: .01em;
+    }
+    .panel-heading {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 16px;
+      line-height: 1.38;
+    }
+    .panel-body { font-size: .9375rem; color: var(--muted); line-height: 1.76; }
+    .panel-body strong { color: var(--ink); font-weight: 600; }
+
+    /* ROOT CAUSE STRIP */
+    .root-strip { background-color: var(--strip-bg); border-bottom: 1px solid var(--border); padding: 52px 0; }
+    .root-strip-inner { max-width: 720px; }
+    .root-strip-body {
+      font-size: 1.0625rem;
+      color: var(--muted);
+      line-height: 1.76;
+      margin-bottom: 28px;
+    }
+    .root-strip-body strong { color: var(--ink); font-weight: 600; }
+    .founder-note {
+      font-size: .9rem;
+      color: var(--muted);
+      font-style: italic;
+      border-left: 3px solid var(--border);
+      padding-left: 16px;
+    }
+
+    /* WHO THIS IS FOR */
+    .section-heading {
+      font-size: clamp(1.45rem, 2.3vw, 1.875rem);
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 36px;
+    }
+    .who-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .who-col { padding: 36px 32px; background-color: var(--panel-bg); }
+    .who-col:first-child { border-right: 1px solid var(--border); }
+    .who-tag {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      padding: 3px 9px;
+      border-radius: 3px;
+      margin-bottom: 14px;
+    }
+    .who-tag.primary { background-color: rgba(242,153,74,.12); color: var(--accent); }
+    .who-tag.secondary { background-color: rgba(45,212,191,.10); color: var(--teal); }
+    .who-col h3 { font-size: 1.0625rem; font-weight: 700; color: var(--ink); margin-bottom: 10px; line-height: 1.35; }
+    .who-col p { font-size: .9375rem; color: var(--muted); line-height: 1.72; }
+
+    .persona-strip {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 24px 28px;
+      background-color: var(--panel-bg);
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+    }
+    .persona-icon {
+      flex-shrink: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background-color: rgba(45,212,191,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .persona-text p { font-size: .9rem; color: var(--muted); line-height: 1.68; }
+    .persona-text p strong { color: var(--ink); font-weight: 600; }
+    .who-sub-list { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .who-sub-list li { display: flex; gap: 10px; align-items: flex-start; }
+    .who-sub-dot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; margin-top: 7px; }
+    .who-sub-dot.resolve { background-color: var(--teal); }
+    .who-sub-dot.route   { background-color: var(--accent); }
+    .who-sub-dot.urgent  { background-color: #e05c5c; }
+    .who-sub-title { font-size: .875rem; font-weight: 600; color: var(--ink); display: block; margin-bottom: 2px; }
+    .who-sub-desc  { font-size: .875rem; color: var(--muted); line-height: 1.6; }
+
+    /* HOW IT WORKS */
+    .how-inner { max-width: 580px; }
+    .steps { display: flex; flex-direction: column; }
+    .step { display: grid; grid-template-columns: 48px 1fr; column-gap: 24px; }
+    .step-left { display: flex; flex-direction: column; align-items: center; }
+    .step-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background-color: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .step-connector { width: 1px; flex: 1; background-color: var(--border); min-height: 16px; margin: 7px 0; }
+    .step:last-child .step-connector { display: none; }
+    .step-content { padding-top: 10px; padding-bottom: 36px; }
+    .step:last-child .step-content { padding-bottom: 0; }
+    .step-content h3 { font-size: 1.0625rem; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .step-content p { font-size: .9375rem; color: var(--muted); line-height: 1.72; }
+
+    /* DIFFERENTIATION */
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .diff-col { padding: 40px 36px; background-color: var(--panel-bg); }
+    .diff-col:first-child { border-right: 1px solid var(--border); }
+    .diff-col-label { font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 16px; letter-spacing: .01em; }
+    .diff-col-heading {
+      font-family: var(--font-head);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 14px;
+      line-height: 1.35;
+    }
+    .diff-col-body { font-size: .9375rem; color: var(--muted); line-height: 1.76; }
+    .diff-col.right .diff-col-label { color: var(--teal); }
+    .diff-col.right .diff-col-heading { color: var(--teal); }
+    .diff-col.right .diff-col-body { color: var(--ink); }
+
+    /* BENEFITS */
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .benefit-col { padding: 32px 28px; background-color: var(--panel-bg); border-right: 1px solid var(--border); }
+    .benefit-col:last-child { border-right: none; }
+    .benefit-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .benefit-icon.fn { background-color: rgba(45,212,191,.10); }
+    .benefit-icon.em { background-color: rgba(242,153,74,.10); }
+    .benefit-icon.so { background-color: rgba(45,212,191,.08); }
+    .benefit-icon.br { background-color: rgba(242,153,74,.08); }
+    .benefit-col h3 { font-size: .875rem; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+    .benefit-col p { font-size: .875rem; color: var(--muted); line-height: 1.68; }
+
+    /* FOOTER */
+    footer { padding: 48px 0; }
+    .footer-inner { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+    .footer-tagline { font-size: .9375rem; color: var(--muted); max-width: 380px; line-height: 1.6; }
+    .footer-contact { font-size: .9375rem; color: var(--accent); text-decoration: none; font-weight: 500; }
+    .footer-contact:hover { text-decoration: underline; }
+
+    /* RESPONSIVE */
+    @media (max-width: 760px) {
+      .hero { padding: 48px 0 56px; }
+      .section { padding: 56px 0; }
+      .root-strip { padding: 40px 0; }
+      .hero-inner { grid-template-columns: 1fr; gap: 36px; }
+      .hero-svg-wrap { max-width: 260px; margin: 0 auto; }
+      .stats-row { gap: 20px; }
+      .split-panel, .who-grid, .diff-grid { grid-template-columns: 1fr; }
+      .panel:first-child, .who-col:first-child, .diff-col:first-child {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel, .who-col, .diff-col { padding: 28px 24px; }
+      .benefits-grid { grid-template-columns: 1fr 1fr; }
+      .benefit-col:nth-child(2) { border-right: none; }
+      .benefit-col:nth-child(1), .benefit-col:nth-child(2) { border-bottom: 1px solid var(--border); }
+      .persona-strip { flex-direction: column; gap: 12px; }
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (max-width: 480px) {
+      .benefits-grid { grid-template-columns: 1fr; }
+      .benefit-col { border-right: none; border-bottom: 1px solid var(--border); }
+      .benefit-col:last-child { border-bottom: none; }
+      .benefit-col:nth-child(2) { border-right: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- BRAND ROW -->
+<header class="brand-row">
+  <div class="container">
+    <div class="brand-inner">
+      <svg class="logo-mark" viewBox="0 0 34 34" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+        <circle cx="17" cy="17" r="15.5" stroke="#2dd4bf" stroke-width="2"/>
+        <rect x="15.25" y="8.5"  width="3.5" height="17"  rx="1.75" fill="#f2994a"/>
+        <rect x="8.5"   y="15.25" width="17" height="3.5" rx="1.75" fill="#f2994a"/>
+      </svg>
+      <span class="wordmark">Q-Doc</span>
+    </div>
+  </div>
+</header>
+
+
+<!-- HERO -->
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="container">
+    <div class="hero-inner">
+
+      <div class="hero-text">
+        <h1 id="hero-heading">
+          Diagnosis <em>without queue.</em>
+        </h1>
+        <div class="hero-subtext">
+          <p>Outside major government hospitals across the country, lines start forming at 4:00&nbsp;AM
+          just to secure an OPD appointment when the doors finally open at 8:00&nbsp;AM. In a nation
+          where the doctor-to-patient ratio is stretched to its absolute limit, healthcare is often
+          defined by endless, exhausting queues. People travel long distances and lose a full day of
+          wages just for a basic checkup or a routine prescription.</p>
+
+          <p>It doesn&rsquo;t have to be this way. Many common, well-documented illnesses don&rsquo;t
+          require an immediate physical consultation. If trained, tested, and validated rigorously,
+          today&rsquo;s advanced models can reliably handle baseline screening and diagnoses.</p>
+
+          <p>Q-Doc is built to take on this exact load. By handling routine checkups, it lifts a
+          massive burden off our doctors so they can focus on critical cases  while sparing
+          patients with non-serious conditions from wasting hours in a waiting room.</p>
+
+          <p>Crucially, it is built for the reality of our population. Powered by advanced voice
+          models across 22 regional languages, the barrier to entry is eliminated. Patients don&rsquo;t
+          need to be tech-savvy or highly literate  they just need to speak in their mother
+          tongue to get immediate, reliable guidance.</p>
+        </div>
+        <a href="#how" class="cta-btn">See how it works</a>
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-number">1&thinsp;:&thinsp;11,082</div>
+            <div class="stat-label">rural India&rsquo;s doctor-to-patient ratio<br>(vs WHO&rsquo;s norm of 1&thinsp;:&thinsp;1,000)</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">22</div>
+            <div class="stat-label">regional languages we&rsquo;re building toward</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Abstract ECG / circle illustration -->
+      <div class="hero-svg-wrap" aria-hidden="true" focusable="false">
+        <svg viewBox="0 0 420 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="210" cy="200" r="162" stroke="#2dd4bf" stroke-width="1.5" opacity="0.38"/>
+          <circle cx="210" cy="200" r="100" stroke="#2dd4bf" stroke-width="1"
+                  stroke-dasharray="3 9" opacity="0.22"/>
+          <circle cx="76"  cy="128" r="4"   fill="#2dd4bf" opacity="0.52"/>
+          <circle cx="338" cy="92"  r="3"   fill="#f2994a" opacity="0.62"/>
+          <circle cx="362" cy="274" r="4.5" fill="#2dd4bf" opacity="0.38"/>
+          <circle cx="60"  cy="284" r="3"   fill="#f2994a" opacity="0.52"/>
+          <circle cx="210" cy="32"  r="3.5" fill="#2dd4bf" opacity="0.46"/>
+          <circle cx="150" cy="362" r="3"   fill="#f2994a" opacity="0.42"/>
+          <circle cx="288" cy="358" r="3.5" fill="#2dd4bf" opacity="0.38"/>
+          <circle cx="374" cy="188" r="3"   fill="#f2994a" opacity="0.46"/>
+          <circle cx="46"  cy="205" r="3"   fill="#2dd4bf" opacity="0.42"/>
+          <circle cx="122" cy="46"  r="3"   fill="#f2994a" opacity="0.38"/>
+          <circle cx="302" cy="44"  r="3"   fill="#2dd4bf" opacity="0.38"/>
+          <circle cx="148" cy="278" r="2.5" fill="#2dd4bf" opacity="0.32"/>
+          <circle cx="278" cy="130" r="2.5" fill="#f2994a" opacity="0.32"/>
+          <line x1="136" y1="124" x2="144" y2="124" stroke="#2dd4bf" stroke-width="1.5" opacity="0.48"/>
+          <line x1="140" y1="120" x2="140" y2="128" stroke="#2dd4bf" stroke-width="1.5" opacity="0.48"/>
+          <line x1="276" y1="266" x2="284" y2="266" stroke="#2dd4bf" stroke-width="1.5" opacity="0.48"/>
+          <line x1="280" y1="262" x2="280" y2="270" stroke="#2dd4bf" stroke-width="1.5" opacity="0.48"/>
+          <line x1="268" y1="122" x2="276" y2="122" stroke="#f2994a" stroke-width="1.5" opacity="0.38"/>
+          <line x1="272" y1="118" x2="272" y2="126" stroke="#f2994a" stroke-width="1.5" opacity="0.38"/>
+          <path d="M 36 200 L 112 200 L 128 216 L 148 148 L 168 258 L 184 190 L 200 200 L 384 200"
+                stroke="#f2994a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="384" cy="200" r="9"   stroke="#f2994a" stroke-width="1" opacity="0.32"/>
+          <circle cx="384" cy="200" r="4.5" fill="#f2994a" opacity="0.88"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- PROBLEM -->
+<section class="section" aria-labelledby="problem-heading">
+  <div class="container">
+    <div class="split-panel">
+
+      <div class="panel">
+        <p class="panel-eyebrow">The core problem</p>
+        <h2 id="problem-heading" class="panel-heading">
+          Chronic shortage, overloaded hospitals,<br>long queues for routine care.
+        </h2>
+        <p class="panel-body">
+          India&rsquo;s doctor shortage is severe enough that even a basic checkup can mean hours
+          of waiting  and that&rsquo;s not only a rural issue. <strong>Urban government
+          hospitals are equally understaffed relative to demand.</strong> Routine and urgent cases
+          funnel through the same overwhelmed system, discouraging people from seeking help until
+          a symptom becomes too serious to ignore.
+        </p>
+      </div>
+
+      <div class="panel">
+        <p class="panel-eyebrow">The impact</p>
+        <h2 class="panel-heading">
+          Patients lose wages. Doctors lose time.<br>Minor conditions worsen.
+        </h2>
+        <p class="panel-body">
+          For anyone on a daily wage, a hospital visit is <strong>a financial trade-off, not just
+          a health decision.</strong> A day spent in a queue is a day without income. When the
+          outcome is &ldquo;you&rsquo;re fine, come back in three months,&rdquo; the deterrent
+          registers clearly. Meanwhile, doctors triaging routine cases have less attention left for
+          patients with genuinely urgent or complex needs.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ROOT CAUSE STRIP -->
+<div class="root-strip" role="region" aria-label="Root cause">
+  <div class="container">
+    <div class="root-strip-inner">
+      <p class="root-strip-body">
+        There&rsquo;s no accessible first-level filter for routine, predictable conditions.
+        <strong>Minor and urgent cases funnel through the same overloaded system</strong> 
+        regardless of location. A patient with a manageable, common condition waits alongside
+        someone in genuine distress, and neither receives the attention they deserve.
+      </p>
+      <p class="founder-note">
+        We&rsquo;ve stood in that queue too  and that&rsquo;s why we&rsquo;re building this.
+      </p>
+    </div>
+  </div>
+</div>
+
+
+<!-- WHO THIS IS FOR -->
+<section class="section" aria-labelledby="who-heading">
+  <div class="container">
+    <h2 id="who-heading" class="section-heading">Who this is for</h2>
+
+    <div class="who-grid">
+      <div class="who-col">
+        <span class="who-tag primary">Primary</span>
+        <h3>First-Point Triage Patients</h3>
+        <p>
+          For individuals arriving at overwhelmed medical facilities, Q-Doc acts as an
+          intelligent front door that categorizes and channels care instantly. Instead of a
+          one-size-fits-all line, the system sorts patients based on actual medical need.
+        </p>
+        <ul class="who-sub-list" role="list">
+          <li>
+            <span class="who-sub-dot resolve" aria-hidden="true"></span>
+            <div>
+              <span class="who-sub-title">Immediate Resolution</span>
+              <span class="who-sub-desc">Straightforward, non-serious conditions are assessed and handled right at the terminal.</span>
+            </div>
+          </li>
+          <li>
+            <span class="who-sub-dot route" aria-hidden="true"></span>
+            <div>
+              <span class="who-sub-title">Targeted Routing</span>
+              <span class="who-sub-desc">Patients who genuinely require a physician&rsquo;s physical examination are directed to the appropriate department.</span>
+            </div>
+          </li>
+          <li>
+            <span class="who-sub-dot urgent" aria-hidden="true"></span>
+            <div>
+              <span class="who-sub-title">Urgent Escalation</span>
+              <span class="who-sub-desc">Critical symptoms are immediately flagged and fast-tracked for emergency attention.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="who-col">
+        <span class="who-tag secondary">Secondary</span>
+        <h3>General Public Seeking On-Demand Care</h3>
+        <p>
+          Anyone needing a reliable health screening without the friction of scheduling and
+          commuting. Wherever a Q-Doc kiosk is stationed, citizens can step up and receive
+          immediate, frictionless medical guidance on their own terms.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- HOW IT WORKS -->
+<section id="how" class="section" aria-labelledby="how-heading">
+  <div class="container">
+    <div class="how-inner">
+      <h2 id="how-heading" class="section-heading">How it works</h2>
+
+      <div class="steps" role="list">
+
+        <div class="step" role="listitem">
+          <div class="step-left" aria-hidden="true">
+            <div class="step-badge">1</div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-content">
+            <h3>Walk up and speak</h3>
+            <p>
+              No app, no form, no appointment. The patient describes how they&rsquo;re feeling,
+              out loud, in their own language  Hindi, Tamil, Telugu, or whichever language
+              they think in. The kiosk listens.
+            </p>
+          </div>
+        </div>
+
+        <div class="step" role="listitem">
+          <div class="step-left" aria-hidden="true">
+            <div class="step-badge">2</div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-content">
+            <h3>Quick vitals and screening</h3>
+            <p>
+              Basic readings  BP, blood sugar, oxygen  are taken alongside the
+              conversation and checked against the patient&rsquo;s own saved health history.
+              The system isn&rsquo;t guessing in isolation; it has context.
+            </p>
+          </div>
+        </div>
+
+        <div class="step" role="listitem">
+          <div class="step-left" aria-hidden="true">
+            <div class="step-badge">3</div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-content">
+            <h3>A clear answer, not just a number</h3>
+            <p>
+              Normal readings come with plain reassurance, in the patient&rsquo;s language.
+              Anything flagged is written up as a structured brief and routed directly to a
+              doctor. The machine doesn&rsquo;t diagnose  it decides who needs to be
+              seen, and makes sure they are.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- WHAT MAKES THIS DIFFERENT -->
+<section class="section" aria-labelledby="diff-heading">
+  <div class="container">
+    <h2 id="diff-heading" class="section-heading">Where we fit in</h2>
+
+    <div class="diff-grid">
+
+      <div class="diff-col left">
+        <p class="diff-col-label">What already exists</p>
+        <h3 class="diff-col-heading">Tools that help doctors decide</h3>
+        <p class="diff-col-body">
+          Government systems like Smart Doctor CDSS and eSanjeevani are built for the
+          provider&rsquo;s side of care  decision support for clinicians,
+          teleconsultation for registered patients. Several kiosk makers already screen
+          well, but mostly through touchscreens and structured forms, in a handful of
+          languages, assuming a patient who can read, type, and navigate a menu.
+        </p>
+      </div>
+
+      <div class="diff-col right">
+        <p class="diff-col-label">What we&rsquo;re building</p>
+        <h3 class="diff-col-heading">A kiosk that listens and speaks back</h3>
+        <p class="diff-col-body">
+          Voice-native, in the patient&rsquo;s own regional language, combined with
+          longitudinal health history  reaching the last-mile public locations
+          existing government infrastructure hasn&rsquo;t fully covered yet. The interface
+          is a conversation, not a form. Patients describe symptoms in their own words;
+          the system understands the way people actually talk about feeling unwell.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- BENEFITS -->
+<section class="section" aria-labelledby="benefits-heading">
+  <div class="container">
+    <h2 id="benefits-heading" class="section-heading">What it changes</h2>
+
+    <div class="benefits-grid">
+
+      <div class="benefit-col">
+        <div class="benefit-icon fn" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3.5 9.5L7 13L14.5 5.5" stroke="#2dd4bf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>Functional</h3>
+        <p>
+          No appointment needed. Saves time and a day&rsquo;s wages by skipping the queue.
+          Catches conditions early through tracked visit history.
+        </p>
+      </div>
+
+      <div class="benefit-col">
+        <div class="benefit-icon em" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 15S2 10.5 2 6a3.5 3.5 0 0 1 7 0 3.5 3.5 0 0 1 7 0c0 4.5-7 9-7 9z" stroke="#f2994a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>Emotional</h3>
+        <p>
+          Reassurance without hospital dread. A sense of control instead of avoidance.
+          Feeling heard, not rushed through a queue.
+        </p>
+      </div>
+
+      <div class="benefit-col">
+        <div class="benefit-icon so" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="5.5" r="2.5" stroke="#2dd4bf" stroke-width="1.6"/>
+            <path d="M1 15c0-3.314 2.686-6 6-6" stroke="#2dd4bf" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="13" cy="5.5" r="2" stroke="#2dd4bf" stroke-width="1.4"/>
+            <path d="M13 9.5c1.657 0 3 1.343 3 3v2.5" stroke="#2dd4bf" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Social</h3>
+        <p>
+          Seen as responsible and health-conscious by family. Less time away from work
+          and customers, without compromising on care.
+        </p>
+      </div>
+
+      <div class="benefit-col">
+        <div class="benefit-icon br" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="9" cy="9" r="7" stroke="#f2994a" stroke-width="1.6"/>
+            <path d="M2 9h14M9 2c-2.5 2-4 4.5-4 7s1.5 5 4 7M9 2c2.5 2 4 4.5 4 7s-1.5 5-4 7" stroke="#f2994a" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>Broader impact</h3>
+        <p>
+          Improves access for underserved populations. Eases pressure on public hospitals.
+          Cuts unnecessary travel for routine checkups.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <p class="footer-tagline">
+        Early-stage  built by a small team that&rsquo;s stood in the queue too.
+      </p>
+      <a href="mailto:hello@qdoc.in" class="footer-contact">hello@qdoc.in</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
