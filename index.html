@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Q-Doc — A basic checkup, in your own language, without the wait.</title>
-  <meta name="description" content="Q-Doc builds AI-powered health screening kiosks for government hospitals and public spaces across India. One visit, one conversation, in the patient's own language — screening and answer in the same sitting. No appointment. No queue.">
+  <title>Q-Doc: Voice-based health screening kiosks for India</title>
+  <meta name="description" content="Q-Doc builds AI health screening kiosks for government hospitals and public spaces in India. Speak in your own language, get screened, and skip the queue.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
@@ -312,12 +312,68 @@
     .benefit-col h3 { font-size: .875rem; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
     .benefit-col p { font-size: .875rem; color: var(--muted); line-height: 1.68; }
 
+    /* ABOUT / CONTACT SECTION */
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .about-col { padding: 40px 36px; background-color: var(--panel-bg); }
+    .about-col:first-child { border-right: 1px solid var(--border); }
+    .about-col-label { font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 16px; letter-spacing: .01em; }
+    .about-col h3 { font-size: 1.0625rem; font-weight: 700; color: var(--ink); margin-bottom: 12px; line-height: 1.35; }
+    .about-col p { font-size: .9375rem; color: var(--muted); line-height: 1.76; margin-bottom: 12px; }
+    .about-col p:last-child { margin-bottom: 0; }
+    .about-col p strong { color: var(--ink); font-weight: 600; }
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: .9375rem;
+      transition: opacity .15s ease;
+    }
+    .contact-link:hover { opacity: .78; text-decoration: underline; }
+    .founder-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background-color: var(--bg);
+    }
+    .founder-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--accent) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: .85rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .founder-meta { display: flex; flex-direction: column; gap: 2px; }
+    .founder-name { font-size: .875rem; font-weight: 600; color: var(--ink); }
+    .founder-role { font-size: .8rem; color: var(--muted); }
+
     /* FOOTER */
     footer { padding: 48px 0; }
     .footer-inner { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
-    .footer-tagline { font-size: .9375rem; color: var(--muted); max-width: 380px; line-height: 1.6; }
+    .footer-tagline { font-size: .9375rem; color: var(--muted); max-width: 480px; line-height: 1.6; }
     .footer-contact { font-size: .9375rem; color: var(--accent); text-decoration: none; font-weight: 500; }
     .footer-contact:hover { text-decoration: underline; }
+    .footer-meta { font-size: .8125rem; color: var(--muted); margin-top: 4px; }
 
     /* RESPONSIVE */
     @media (max-width: 760px) {
@@ -327,12 +383,12 @@
       .hero-inner { grid-template-columns: 1fr; gap: 36px; }
       .hero-svg-wrap { max-width: 260px; margin: 0 auto; }
       .stats-row { gap: 20px; }
-      .split-panel, .who-grid, .diff-grid { grid-template-columns: 1fr; }
-      .panel:first-child, .who-col:first-child, .diff-col:first-child {
+      .split-panel, .who-grid, .diff-grid, .about-grid { grid-template-columns: 1fr; }
+      .panel:first-child, .who-col:first-child, .diff-col:first-child, .about-col:first-child {
         border-right: none;
         border-bottom: 1px solid var(--border);
       }
-      .panel, .who-col, .diff-col { padding: 28px 24px; }
+      .panel, .who-col, .diff-col, .about-col { padding: 28px 24px; }
       .benefits-grid { grid-template-columns: 1fr 1fr; }
       .benefit-col:nth-child(2) { border-right: none; }
       .benefit-col:nth-child(1), .benefit-col:nth-child(2) { border-bottom: 1px solid var(--border); }
@@ -373,7 +429,7 @@
 
       <div class="hero-text">
         <h1 id="hero-heading">
-          Diagnosis <em>without queue.</em>
+          Screening <em>without queue.</em>
         </h1>
         <div class="hero-subtext">
           <p>Outside major government hospitals across the country, lines start forming at 4:00&nbsp;AM
@@ -382,13 +438,14 @@
           defined by endless, exhausting queues. People travel long distances and lose a full day of
           wages just for a basic checkup or a routine prescription.</p>
 
-          <p>It doesn&rsquo;t have to be this way. Many common, well-documented illnesses don&rsquo;t
-          require an immediate physical consultation. If trained, tested, and validated rigorously,
-          today&rsquo;s advanced models can reliably handle baseline screening and diagnoses.</p>
+          <p>It doesn&rsquo;t have to be this way. Many common conditions can be screened reliably
+          before a patient ever reaches a doctor. A well-designed first filter  one that listens,
+          checks basic vitals, and routes intelligently  can safely handle a large share of routine
+          OPD load without replacing clinical judgment.</p>
 
-          <p>Q-Doc is built to take on this exact load. By handling routine checkups, it lifts a
-          massive burden off our doctors so they can focus on critical cases  while sparing
-          patients with non-serious conditions from wasting hours in a waiting room.</p>
+          <p>Q-Doc is built to be that filter. By screening patients at the door, it lifts a massive
+          burden off our doctors so they can focus on critical cases  while sparing patients with
+          non-serious conditions from wasting hours in a waiting room.</p>
 
           <p>Crucially, it is built for the reality of our population. Powered by advanced voice
           models across 22 regional languages, the barrier to entry is eliminated. Patients don&rsquo;t
@@ -494,7 +551,8 @@
         someone in genuine distress, and neither receives the attention they deserve.
       </p>
       <p class="founder-note">
-        We&rsquo;ve stood in that queue too  and that&rsquo;s why we&rsquo;re building this.
+        &ldquo;We&rsquo;ve stood in that queue too &mdash; and that&rsquo;s why we&rsquo;re building this.&rdquo;<br>
+        <strong style="font-style: normal; color: var(--ink);">Divyansh Soni</strong>, Founder &middot; Q-Doc, founded&nbsp;2026
       </p>
     </div>
   </div>
@@ -649,17 +707,72 @@
 </section>
 
 
+<!-- ABOUT / CONTACT -->
+<section id="about" class="section" aria-labelledby="about-heading">
+  <div class="container">
+    <h2 id="about-heading" class="section-heading">About &amp; Contact</h2>
+    <div class="about-grid">
 
+      <div class="about-col">
+        <p class="about-col-label">Who we are</p>
+        <h3>Built by someone who&rsquo;s been in that queue</h3>
+        <p>
+          Q-Doc is an early-stage health-tech startup building <strong>AI-powered screening
+          kiosks for government hospitals and public spaces across India</strong>. Patients
+          describe symptoms in their own language, basic vitals are checked against their
+          health history, and anyone who needs a doctor is routed to one.
+        </p>
+        <p>
+          Our goal is to cut OPD queues and free doctors for critical cases.
+        </p>
+        <p>
+          I&rsquo;m a 3rd-year <strong>Mathematics and Computing student at IIT&nbsp;BHU</strong>.
+        </p>
+        <div class="founder-badge">
+          <div class="founder-avatar" aria-hidden="true">DS</div>
+          <div class="founder-meta">
+            <span class="founder-name">Divyansh Soni</span>
+            <span class="founder-role">Founder &middot; Q-Doc &middot; Founded&nbsp;2026</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-col">
+        <p class="about-col-label">Get in touch</p>
+        <h3>We&rsquo;d love to hear from you</h3>
+        <p>
+          Whether you run a government hospital, manage public health infrastructure, or
+          are a researcher interested in last-mile healthcare access  reach out.
+        </p>
+        <p>
+          We are actively looking for pilot partners across India.
+        </p>
+        <a href="mailto:founder@q-doc.live" class="contact-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+          founder@q-doc.live
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>
 
 
 <!-- FOOTER -->
 <footer>
   <div class="container">
     <div class="footer-inner">
-      <p class="footer-tagline">
-        Early-stage  built by a small team that&rsquo;s stood in the queue too.
-      </p>
-      <a href="mailto:divyanshksoni@gmail.com" class="footer-contact">divyanshksoni@gmail.com</a>
+      <div>
+        <p class="footer-tagline">
+          Early-stage &mdash; built by <strong style="color: var(--ink);">Divyansh Soni</strong> and
+          a small team that&rsquo;s stood in that queue too. Founded&nbsp;2026.
+        </p>
+      </div>
+      <a href="mailto:founder@q-doc.live" class="footer-contact">founder@q-doc.live</a>
     </div>
   </div>
 </footer>
