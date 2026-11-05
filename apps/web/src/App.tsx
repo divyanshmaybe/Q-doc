@@ -67,6 +67,8 @@ export const App: React.FC = () => {
     }
     return "landing";
   });
+  const viewRef = useRef(view);
+  const activeTurnTokenRef = useRef(0);
   const [mode, setMode] = useState<"autonomous" | "supervised">("autonomous");
 
   // ── Session state ──
@@ -169,6 +171,12 @@ export const App: React.FC = () => {
 
   // ── Speech Playback (Sarvam base64 audio priority + WebSpeech fallback) ──
   const playSpeech = (text: string, audioB64?: string | null) => {
+    // Strict Guard: Never speak if the user is not in the voice / kiosk demo view!
+    if (viewRef.current !== "voice") {
+      console.log("[App] playSpeech blocked: user is on view", viewRef.current);
+      return;
+    }
+
     // 1. Stop any previously playing audio or speech
     if (activeAudioRef.current) {
       try {
@@ -208,7 +216,7 @@ export const App: React.FC = () => {
               if (err.name === "NotAllowedError") {
                 setAutoplayBlocked(true);
               }
-              if (err.name !== "AbortError") {
+              if (err.name !== "AbortError" && viewRef.current === "voice") {
                 speakSynthesisFallback(text);
               }
             });
@@ -224,7 +232,7 @@ export const App: React.FC = () => {
   };
 
   const speakSynthesisFallback = (text: string) => {
-    if (!("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window) || viewRef.current !== "voice") return;
     try {
       (window as any).__currentUtterance = null;
       window.speechSynthesis.cancel();
@@ -240,6 +248,10 @@ export const App: React.FC = () => {
       const matchedVoice = getPreferredVoice(isHi);
 
       const speakNextChunk = () => {
+        if (viewRef.current !== "voice") {
+          (window as any).__currentUtterance = null;
+          return;
+        }
         if (currentIndex >= sentences.length) {
           (window as any).__currentUtterance = null;
           return;
@@ -282,6 +294,10 @@ export const App: React.FC = () => {
     async (text: string, audioBase64?: string) => {
       const trimmed = text.trim();
       if (!trimmed && !audioBase64) return;
+      if (viewRef.current !== "voice") return;
+
+      activeTurnTokenRef.current += 1;
+      const turnToken = activeTurnTokenRef.current;
 
       const currentLang = sessionLangRef.current || sessionLang;
       let activeSessionId = sessionIdRef.current || sessionId;
@@ -289,11 +305,13 @@ export const App: React.FC = () => {
         console.warn("[App] Initializing session first...");
         try {
           const res = await startSession(currentLang, mode);
+          if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
           activeSessionId = res.session_id;
           setSessionId(activeSessionId);
           sessionIdRef.current = activeSessionId;
           if (res.language) setSessionLang(res.language);
         } catch (e: any) {
+          if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
           setErrorMsg("Could not connect to session. Ensure backend server is running.");
           setAgentPhase("error");
           return;
@@ -308,6 +326,13 @@ export const App: React.FC = () => {
 
       try {
         const res = await sendTurn(activeSessionId, trimmed, currentLang, audioBase64);
+        
+        // Strict cancellation guard: discard if user navigated away or cancelled while analyzing
+        if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") {
+          console.log("[App] Suppressing turn response because user navigated away or cancelled.");
+          return;
+        }
+
         setSlots(res.slots || {});
 
         // Automatically update session language if language switch detected
@@ -332,12 +357,17 @@ export const App: React.FC = () => {
           setPhotoReady(true);
         }
 
-        setTimeout(() => setAgentPhase("idle"), 3500);
+        setTimeout(() => {
+          if (viewRef.current === "voice") setAgentPhase("idle");
+        }, 3500);
       } catch (err: any) {
+        if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
         console.error("[App] Turn error:", err);
         setErrorMsg(err.message || "Turn submission failed.");
         setAgentPhase("error");
-        setTimeout(() => setAgentPhase("idle"), 3000);
+        setTimeout(() => {
+          if (viewRef.current === "voice") setAgentPhase("idle");
+        }, 3000);
       }
     },
     [sessionId, mode, sessionLang]
@@ -354,6 +384,9 @@ export const App: React.FC = () => {
 
   // ── Speech Controller helpers ──
   const stopSpeech = () => {
+    // Invalidate any in-flight asynchronous reasoning / speech generation
+    activeTurnTokenRef.current += 1;
+
     if (activeAudioRef.current) {
       try {
         activeAudioRef.current.pause();
@@ -367,8 +400,19 @@ export const App: React.FC = () => {
         window.speechSynthesis.cancel();
       } catch (_) {}
     }
+    try {
+      voice.stopListening();
+    } catch (_) {}
     setAgentPhase("idle");
   };
+
+  // Sync viewRef and instantly kill all speech whenever user leaves voice mode
+  useEffect(() => {
+    viewRef.current = view;
+    if (view !== "voice") {
+      stopSpeech();
+    }
+  }, [view]);
 
   // ── Init (prevent double firing in React StrictMode) ──
   const initializedRef = useRef(false);
@@ -478,6 +522,13 @@ export const App: React.FC = () => {
     if (typeof window !== "undefined") window.location.hash = "";
   };
 
+  const handleOpenClinician = () => {
+    stopSpeech();
+    setView("clinician");
+    loadBriefs();
+    if (typeof window !== "undefined") window.location.hash = "#clinician";
+  };
+
   const handleModeToggle = async (m: "autonomous" | "supervised") => {
     setMode(m);
     try { await setAdminMode(m); } catch (_) {}
@@ -488,6 +539,9 @@ export const App: React.FC = () => {
     const activeSessionId = sessionIdRef.current || sessionId;
     if (!activeSessionId) return;
 
+    activeTurnTokenRef.current += 1;
+    const turnToken = activeTurnTokenRef.current;
+
     setErrorMsg(null);
     setAgentPhase("thinking");
     setView("voice");
@@ -495,11 +549,15 @@ export const App: React.FC = () => {
 
     try {
       const photoRes = await uploadPhoto(activeSessionId, file);
+      if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
+
       if (!photoRes.quality_passed) {
         setAgentMessage(photoRes.message);
         setAgentPhase("speaking");
         playSpeech(photoRes.message);
-        setTimeout(() => setAgentPhase("idle"), 2500);
+        setTimeout(() => {
+          if (viewRef.current === "voice") setAgentPhase("idle");
+        }, 2500);
         return;
       }
 
@@ -519,6 +577,8 @@ export const App: React.FC = () => {
         // Fallback or immediate analysis
         setAgentMessage("Computing differential diagnosis & Bayesian posteriors...");
         const analysisRes = await analyzeSession(activeSessionId, photoRes.image_id);
+        if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
+
         setVerdictData(analysisRes);
         const msg = analysisRes.policy_decision.spoken_patient_message;
         setAgentMessage(msg);
@@ -528,9 +588,12 @@ export const App: React.FC = () => {
         playSpeech(msg, analysisRes.audio?.audio_base64);
       }
     } catch (err: any) {
+      if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
       setErrorMsg(err.message || "Analysis failed.");
       setAgentPhase("error");
-      setTimeout(() => setAgentPhase("idle"), 3000);
+      setTimeout(() => {
+        if (viewRef.current === "voice") setAgentPhase("idle");
+      }, 3000);
     }
   };
 
@@ -539,12 +602,17 @@ export const App: React.FC = () => {
     const targetImageId = uploadedPhotoId;
     if (!activeSessionId || !targetImageId) return;
 
+    activeTurnTokenRef.current += 1;
+    const turnToken = activeTurnTokenRef.current;
+
     setErrorMsg(null);
     setAgentPhase("thinking");
     setAgentMessage("Computing differential diagnosis & Bayesian posteriors...");
 
     try {
       const analysisRes = await analyzeSession(activeSessionId, targetImageId);
+      if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
+
       setVerdictData(analysisRes);
 
       const msg = analysisRes.policy_decision.spoken_patient_message;
@@ -552,11 +620,16 @@ export const App: React.FC = () => {
       setLatestAudioB64(analysisRes.audio?.audio_base64 || null);
       setAgentPhase("speaking");
       playSpeech(msg, analysisRes.audio?.audio_base64);
-      setTimeout(() => setAgentPhase("idle"), 4000);
+      setTimeout(() => {
+        if (viewRef.current === "voice") setAgentPhase("idle");
+      }, 4000);
     } catch (err: any) {
+      if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
       setErrorMsg(err.message || "Analysis failed.");
       setAgentPhase("error");
-      setTimeout(() => setAgentPhase("idle"), 3000);
+      setTimeout(() => {
+        if (viewRef.current === "voice") setAgentPhase("idle");
+      }, 3000);
     }
   };
 
@@ -601,11 +674,7 @@ export const App: React.FC = () => {
     return (
       <LandingPage
         onLaunchDemo={handleLaunchDemo}
-        onOpenClinician={() => {
-          setView("clinician");
-          loadBriefs();
-          if (typeof window !== "undefined") window.location.hash = "#clinician";
-        }}
+        onOpenClinician={handleOpenClinician}
       />
     );
   }
@@ -691,9 +760,9 @@ export const App: React.FC = () => {
             onClick={() => {
               if (view === "clinician") {
                 setView("voice");
+                if (typeof window !== "undefined") window.location.hash = "#demo";
               } else {
-                setView("clinician");
-                loadBriefs();
+                handleOpenClinician();
               }
             }}
             className={`p-2 rounded-full transition ${
@@ -823,7 +892,7 @@ export const App: React.FC = () => {
 
                     {verdictData.doctor_brief_id && (
                       <button
-                        onClick={() => { setView("clinician"); loadBriefs(); }}
+                        onClick={handleOpenClinician}
                         className="text-[10px] font-mono text-white/50 hover:text-electric-light transition text-center pt-1"
                       >
                         View Clinician Brief →
