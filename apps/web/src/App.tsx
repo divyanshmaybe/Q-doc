@@ -437,6 +437,9 @@ export const App: React.FC = () => {
     // If reload: NEVER auto-speak!
     // If directly arriving via #demo link (e.g. from visiting page): speak!
     const isDirectDemoLaunch = !isReload && typeof window !== "undefined" && window.location.hash.includes("demo");
+    if (isDirectDemoLaunch) {
+      viewRef.current = "voice";
+    }
     await handleNewSession(undefined, isDirectDemoLaunch);
   };
 
@@ -499,32 +502,71 @@ export const App: React.FC = () => {
 
   // ── Explicit launch handler from visiting page ──
   const handleLaunchDemo = () => {
+    viewRef.current = "voice";
     setView("voice");
     if (typeof window !== "undefined") window.location.hash = "#demo";
 
     const targetLang = sessionLangRef.current || sessionLang;
     const defaultMsg = targetLang.toLowerCase().includes("hi") ? DEFAULT_WELCOME_HI : DEFAULT_WELCOME_EN;
-    const msg = agentMessageRef.current || agentMessage || defaultMsg;
-    const b64 = latestAudioB64Ref.current || latestAudioB64;
 
-    // Direct synchronous speech launch inside the user's click gesture
-    playSpeech(msg, b64);
+    // Reset dialogue & consultation state cleanly
+    setErrorMsg(null);
+    setSlots({});
+    setPhotoReady(false);
+    setUploadedPhotoId(null);
+    setVerdictData(null);
+    setLastUserSpeech(null);
+    setAgentMessage(defaultMsg);
+    agentMessageRef.current = defaultMsg;
 
-    // If session is still initializing or missing, ensure it starts in parallel
-    if (!sessionIdRef.current) {
-      handleNewSession(undefined, false);
+    let welcomeB64: string | null = null;
+    try {
+      welcomeB64 = localStorage.getItem("qdoc_welcome_b64_" + targetLang);
+    } catch (_) {}
+    if (!welcomeB64) {
+      welcomeB64 = latestAudioB64Ref.current;
+    }
+
+    // Direct synchronous speech launch inside the user's click gesture - ALWAYS GREET!
+    playSpeech(defaultMsg, welcomeB64);
+
+    // Initialize fresh session in background for this consultation
+    startSessionInBackground(targetLang);
+  };
+
+  const startSessionInBackground = async (targetLang: string) => {
+    try {
+      const res = await startSession(targetLang, mode);
+      setSessionId(res.session_id);
+      sessionIdRef.current = res.session_id;
+      if (res.language) {
+        setSessionLang(res.language);
+        sessionLangRef.current = res.language;
+      }
+      setSlots(res.slots || {});
+      if (res.audio?.audio_base64) {
+        latestAudioB64Ref.current = res.audio.audio_base64;
+        setLatestAudioB64(res.audio.audio_base64);
+        try {
+          localStorage.setItem("qdoc_welcome_b64_" + (res.language || targetLang), res.audio.audio_base64);
+        } catch (_) {}
+      }
+    } catch (err: any) {
+      console.warn("[App] Background session start:", err);
     }
   };
 
   const handleReturnHome = () => {
-    stopSpeech();
+    viewRef.current = "landing";
     setView("landing");
+    stopSpeech();
     if (typeof window !== "undefined") window.location.hash = "";
   };
 
   const handleOpenClinician = () => {
-    stopSpeech();
+    viewRef.current = "clinician";
     setView("clinician");
+    stopSpeech();
     loadBriefs();
     if (typeof window !== "undefined") window.location.hash = "#clinician";
   };
