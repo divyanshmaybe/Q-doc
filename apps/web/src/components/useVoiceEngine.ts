@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 /**
  * useVoiceEngine — Dual-Engine Voice Capture:
  * 1. Primary: Browser Web Speech API (`SpeechRecognition`) for instant live transcription.
+ *    - Continuous resilience: auto-recovers from Chrome "no-speech" and spontaneous `onend` events.
+ *    - Adaptive pause detection: 3.2s-4.2s natural pause threshold so users aren't cut off mid-thought.
  * 2. Secondary: MediaRecorder WAV/WebM recording sent to Sarvam AI STT (`saaras:v3`)
  *    if the browser STT doesn't return text or is blocked.
  * 3. AnalyserNode metering for real-time reactive orb visualizer.
@@ -33,6 +35,9 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
   useEffect(() => {
     langRef.current = language;
   }, [language]);
+
+  const isListeningRef = useRef<boolean>(false);
+  const manualStopRef = useRef<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -160,17 +165,26 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
 
   // ── Stop listening ──
   const stopListening = useCallback(async () => {
+    manualStopRef.current = true;
+    isListeningRef.current = false;
+    setIsListening(false);
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch (_) {}
       recognitionRef.current = null;
     }
     await flushTranscript();
     teardownAudio();
-    setIsListening(false);
   }, [flushTranscript, teardownAudio]);
 
   // ── Start listening ──
   const startListening = useCallback(async () => {
+    manualStopRef.current = false;
     setPermissionError(null);
     latestSpeechRef.current = "";
     isFlushedRef.current = false;
@@ -187,6 +201,8 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
           ? "Microphone access denied. Please allow microphone permissions in your browser bar."
           : "Unable to access microphone on this device."
       );
+      isListeningRef.current = false;
+      setIsListening(false);
       return;
     }
     streamRef.current = stream;
@@ -234,17 +250,21 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = langRef.current || "en-IN";
+      recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        console.log("[useVoiceEngine] SpeechRecognition onstart");
+        isListeningRef.current = true;
         setIsListening(true);
         isFlushedRef.current = false;
       };
 
       recognition.onresult = (event: any) => {
-        let interim = "";
         let finalAccum = "";
+        let interim = "";
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        // Iterate through all results to build full transcript seamlessly
+        for (let i = 0; i < event.results.length; i++) {
           const transcriptPart = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             finalAccum += transcriptPart + " ";
@@ -258,51 +278,88 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
           latestSpeechRef.current = activeText;
           setInterimTranscript(activeText);
 
-          // Auto-flush after 1.8 seconds of silence
-          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          // Clear any previous pause timer
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+
+          // Dynamic natural pause detection:
+          // Give users 3.2s of silence if > 2 words, or 4.2s for short hesitations.
+          // This completely prevents cutting the user off mid-sentence while they think!
+          const wordCount = activeText.split(/\s+/).filter(Boolean).length;
+          const pauseThreshold = wordCount >= 3 ? 3200 : 4200;
+
           silenceTimerRef.current = setTimeout(() => {
-            console.log("[useVoiceEngine] Auto-flushing on pause");
+            console.log(`[useVoiceEngine] Auto-flushing on natural pause (${pauseThreshold}ms)`);
             stopListening();
-          }, 1800);
+          }, pauseThreshold);
         }
       };
 
       recognition.onerror = (e: any) => {
         console.warn("[useVoiceEngine] Web Speech API error:", e.error);
+        if (e.error === "no-speech") {
+          // Chrome triggers no-speech if silence detected before user starts talking.
+          // Do NOT shut down! Keep listening.
+          return;
+        }
+        if (e.error === "audio-capture") {
+          setPermissionError("No microphone detected. Please check your audio inputs.");
+          stopListening();
+          return;
+        }
         if (e.error === "not-allowed" || e.error === "permission-denied") {
           setPermissionError("Microphone access denied. Please allow microphone permission in the address bar.");
+          stopListening();
+          return;
         }
       };
 
       recognition.onend = () => {
-        console.log("[useVoiceEngine] SpeechRecognition ended");
+        console.log("[useVoiceEngine] SpeechRecognition onend. isListening:", isListeningRef.current, "manualStop:", manualStopRef.current);
+        // If Chrome stopped recognition spontaneously (e.g. after interim silence),
+        // and user has NOT stopped listening or flushed, restart it immediately!
+        if (isListeningRef.current && !manualStopRef.current && !isFlushedRef.current) {
+          console.log("[useVoiceEngine] Restarting recognition stream to prevent premature cutoff...");
+          try {
+            recognition.start();
+          } catch (err) {
+            console.warn("[useVoiceEngine] Could not restart recognition:", err);
+          }
+        }
       };
 
       recognitionRef.current = recognition;
 
       try {
+        isListeningRef.current = true;
+        setIsListening(true);
         recognition.start();
       } catch (err) {
         console.warn("[useVoiceEngine] SpeechRecognition start error:", err);
       }
     } else {
       console.warn("[useVoiceEngine] Browser SpeechRecognition not present; using MediaRecorder Sarvam fallback.");
+      isListeningRef.current = true;
       setIsListening(true);
     }
   }, [meterLoop, teardownAudio, stopListening]);
 
   // ── Toggle ──
   const toggleListening = useCallback(() => {
-    if (isListening) {
+    if (isListeningRef.current) {
       stopListening();
     } else {
       startListening();
     }
-  }, [isListening, startListening, stopListening]);
+  }, [startListening, stopListening]);
 
   // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
+      manualStopRef.current = true;
+      isListeningRef.current = false;
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch (_) {}
       }

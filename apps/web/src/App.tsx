@@ -254,6 +254,9 @@ export const App: React.FC = () => {
         }
         if (currentIndex >= sentences.length) {
           (window as any).__currentUtterance = null;
+          if (viewRef.current === "voice") {
+            setAgentPhase("idle");
+          }
           return;
         }
 
@@ -379,6 +382,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (voice.isListening && agentPhase !== "thinking" && agentPhase !== "speaking") {
       setAgentPhase("listening");
+    } else if (!voice.isListening && agentPhase === "listening") {
+      setAgentPhase("idle");
     }
   }, [voice.isListening, agentPhase]);
 
@@ -692,10 +697,13 @@ export const App: React.FC = () => {
       if (msg) playSpeech(msg, b64);
       return;
     }
-    if (agentPhase === "idle" || agentPhase === "error") {
-      voice.startListening();
-    } else if (agentPhase === "listening") {
+    if (voice.isListening) {
       voice.stopListening();
+    } else if (agentPhase !== "thinking") {
+      if (agentPhase === "speaking") {
+        stopSpeech();
+      }
+      voice.startListening();
     }
   };
 
