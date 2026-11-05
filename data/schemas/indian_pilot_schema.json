@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConsentedIndianClinicalPilotRecord",
+  "description": "Standardized schema for consented Indian clinical pilot data ingestion (IRB-compliant, Fitzpatrick IV-VI tagged, dual-dermatologist adjudicated).",
+  "type": "object",
+  "required": [
+    "pilot_record_id",
+    "site_center_id",
+    "patient_demographics",
+    "patient_clinical_history",
+    "imaging_artifacts",
+    "ground_truth_adjudication",
+    "ethical_consent"
+  ],
+  "properties": {
+    "pilot_record_id": {
+      "type": "string",
+      "description": "Anonymized unique clinical case identifier (e.g. IN-PILOT-DELHI-0042)"
+    },
+    "site_center_id": {
+      "type": "string",
+      "description": "Clinical center identifier (e.g. AIIMS-ND, CMC-VELLORE, PGI-CHD)"
+    },
+    "ethical_consent": {
+      "type": "object",
+      "required": ["patient_consent_obtained", "consent_form_id", "irb_protocol_number", "timestamp_utc"],
+      "properties": {
+        "patient_consent_obtained": { "type": "boolean" },
+        "consent_form_id": { "type": "string" },
+        "irb_protocol_number": { "type": "string" },
+        "timestamp_utc": { "type": "string", "format": "date-time" }
+      }
+    },
+    "patient_demographics": {
+      "type": "object",
+      "required": ["age", "biological_sex", "fitzpatrick_skin_type"],
+      "properties": {
+        "age": { "type": "integer", "minimum": 0, "maximum": 120 },
+        "biological_sex": { "type": "string", "enum": ["male", "female", "other"] },
+        "fitzpatrick_skin_type": {
+          "type": "string",
+          "enum": ["Type I", "Type II", "Type III", "Type IV", "Type V", "Type VI"],
+          "description": "Clinical phototype; Indian cohort predominantly Types IV, V, and VI."
+        },
+        "ethnicity_geographic_region": { "type": "string", "enum": ["North", "South", "East", "West", "Central", "North-East"] }
+      }
+    },
+    "patient_clinical_history": {
+      "type": "object",
+      "required": ["anatomical_site", "duration_days", "has_pruritus", "has_fever", "household_contacts_affected"],
+      "properties": {
+        "chief_complaint_verbatim": { "type": "string" },
+        "anatomical_site": { "type": "string" },
+        "duration_days": { "type": "integer" },
+        "has_pruritus": { "type": "boolean" },
+        "nocturnal_pruritus": { "type": "boolean" },
+        "has_fever": { "type": "boolean" },
+        "has_pain": { "type": "boolean" },
+        "is_spreading": { "type": "boolean" },
+        "household_contacts_affected": { "type": "boolean" },
+        "prior_topical_steroid_use": { "type": "boolean", "description": "Critical for detecting tinea incognito in Indian context" },
+        "current_medications": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "imaging_artifacts": {
+      "type": "object",
+      "required": ["clinical_photo_path", "camera_hardware_metadata"],
+      "properties": {
+        "clinical_photo_path": { "type": "string" },
+        "dermoscopy_photo_path": { "type": "string" },
+        "camera_hardware_metadata": {
+          "type": "object",
+          "properties": {
+            "device_model": { "type": "string" },
+            "focal_length_mm": { "type": "number" },
+            "flash_used": { "type": "boolean" },
+            "ambient_lux_estimate": { "type": "number" }
+          }
+        }
+      }
+    },
+    "ground_truth_adjudication": {
+      "type": "object",
+      "required": ["adjudicated_condition_id", "confirmatory_test_performed", "confirmatory_result", "reviewer_consensus_level"],
+      "properties": {
+        "adjudicated_condition_id": { "type": "string" },
+        "icd10_code": { "type": "string" },
+        "reviewer_consensus_level": { "type": "string", "enum": ["unanimous_dual", "adjudicated_by_referee", "pathology_gold_standard"] },
+        "confirmatory_test_performed": {
+          "type": "string",
+          "enum": ["KOH_mount", "punch_biopsy", "patch_test", "dermoscopy_documented", "bacterial_culture", "tzanck_smear", "none_clinical_only"]
+        },
+        "confirmatory_result": { "type": "string" },
+        "dermatologist_1_diagnosis": { "type": "string" },
+        "dermatologist_2_diagnosis": { "type": "string" },
+        "referee_dermatologist_diagnosis": { "type": "string" }
+      }
+    }
+  }
+}
+

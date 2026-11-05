@@ -409,14 +409,20 @@
 <!-- BRAND ROW -->
 <header class="brand-row">
   <div class="container">
-    <div class="brand-inner">
-      <svg class="logo-mark" viewBox="0 0 34 34" fill="none"
-           xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-        <circle cx="17" cy="17" r="15.5" stroke="#4361ee" stroke-width="2"/>
-        <rect x="15.25" y="8.5"  width="3.5" height="17"  rx="1.75" fill="#f72585"/>
-        <rect x="8.5"   y="15.25" width="17" height="3.5" rx="1.75" fill="#f72585"/>
-      </svg>
-      <span class="wordmark">Q-Doc</span>
+    <div class="brand-inner" style="justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 11px;">
+        <svg class="logo-mark" viewBox="0 0 34 34" fill="none"
+             xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+          <circle cx="17" cy="17" r="15.5" stroke="#4361ee" stroke-width="2"/>
+          <rect x="15.25" y="8.5"  width="3.5" height="17"  rx="1.75" fill="#f72585"/>
+          <rect x="8.5"   y="15.25" width="17" height="3.5" rx="1.75" fill="#f72585"/>
+        </svg>
+        <span class="wordmark">Q-Doc</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <a href="http://localhost:5173/#clinician" class="cta-btn" style="margin-bottom: 0; padding: 7px 15px; font-size: .8125rem; background-color: transparent; border: 1px solid var(--border); color: var(--muted);">Clinician Portal</a>
+        <a href="http://localhost:5173/#demo" class="cta-btn" style="margin-bottom: 0; padding: 7px 18px; font-size: .8125rem;">Launch AI Demo</a>
+      </div>
     </div>
   </div>
 </header>
@@ -452,7 +458,10 @@
           need to be tech-savvy or highly literate  they just need to speak in their mother
           tongue to get immediate, reliable guidance.</p>
         </div>
-        <a href="#how" class="cta-btn">See how it works</a>
+        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 48px; flex-wrap: wrap;">
+          <a href="http://localhost:5173/#demo" class="cta-btn" style="margin-bottom: 0;">Launch AI Kiosk Demo →</a>
+          <a href="#how" class="cta-btn" style="margin-bottom: 0; background-color: transparent; border: 1px solid var(--border); color: var(--ink);">See how it works</a>
+        </div>
         <div class="stats-row">
           <div class="stat-item">
             <div class="stat-number">1&thinsp;:&thinsp;11,082</div>
@@ -735,6 +744,13 @@
             <span class="founder-role">Founder &middot; Q-Doc &middot; Founded&nbsp;2026</span>
           </div>
         </div>
+        <div class="founder-badge" style="margin-top: 10px;">
+          <div class="founder-avatar" aria-hidden="true" style="background: linear-gradient(135deg,#4361ee 0%,#3a0ca3 100%); font-size:.7rem; letter-spacing:-.02em;">IIT</div>
+          <div class="founder-meta">
+            <span class="founder-name">IIT BHU Incubation Centre</span>
+            <span class="founder-role">Supported by</span>
+          </div>
+        </div>
       </div>
 
       <div class="about-col">
@@ -769,6 +785,7 @@
       <div>
         <p class="footer-tagline">
           Early-stage &mdash; built by a team that&rsquo;s stood in that queue too. Founded&nbsp;2026.
+          Supported by <strong style="color: var(--ink);">IIT BHU Incubation Centre</strong>.
         </p>
       </div>
       <a href="https://mail.google.com/mail/?view=cm&to=founder@q-doc.live" class="footer-contact" target="_blank" rel="noopener">founder@q-doc.live</a>

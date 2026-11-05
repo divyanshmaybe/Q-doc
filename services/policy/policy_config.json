@@ -1,0 +1,18 @@
+{
+  "mode": "autonomous",
+  "image_quality_below": 0.5,
+  "top1_confidence_below": 0.7,
+  "top1_top2_margin_below": 0.15,
+  "always_refer_flags": [
+    "possible_malignancy",
+    "rapid_spread",
+    "fever_with_rash",
+    "mucosal_involvement",
+    "infant_under_1_year",
+    "pregnancy"
+  ],
+  "never_output": [
+    "prescriptions",
+    "drug_doses"
+  ]
+}

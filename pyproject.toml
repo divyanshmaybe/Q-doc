@@ -1,0 +1,31 @@
+[project]
+name = "qdoc-mvp"
+version = "0.1.0"
+description = "Q-Doc: Voice-first and photo-based skin screening agent with controllable autonomy"
+authors = [{ name = "Q-Doc Team" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0.1",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "opencv-python-headless>=4.8.0",
+    "pillow>=10.0.0",
+    "requests>=2.31.0",
+    "httpx>=0.27.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+

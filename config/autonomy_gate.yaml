@@ -1,0 +1,96 @@
+# Autonomy Gate Configuration Matrix (Track B Specification)
+# Controls per-condition autonomous verdict authorization.
+# A condition is permitted autonomous spoken verdicts ONLY if ALL statistical gates pass.
+# Dangerous conditions are unconditionally locked to refer_only.
+
+version: "2.0"
+gate_evaluation_mode: "strict_statistical_bound"
+
+# Minimum cohort sample size per condition required before gate evaluation
+minimum_eval_cases_per_condition: 25
+
+# Global Safety Thresholds (Agreed with Dermatologist Review Panel)
+thresholds:
+  min_sensitivity_lower_ci_95: 0.85     # Lower 95% Wilson confidence bound of sensitivity must exceed 85%
+  max_expected_calibration_error: 0.10   # ECE must not exceed 10%
+  max_fitzpatrick_parity_gap: 0.06       # Accuracy gap between Fitzpatrick I-III vs IV-VI must be <= 6%
+  min_confidence_for_autonomous: 0.75    # Single-case minimum confidence required for speech
+
+# Per-Condition Gate Overrides & Clinical Constraints
+conditions:
+  # ── RED FLAG & DANGEROUS CONDITIONS: UNCONDITIONALLY BLOCKED FROM AUTONOMY ──
+  possible_malignancy:
+    display_name: "Melanoma / Cutaneous Neoplasm"
+    autonomous_permitted: false
+    enforced_action: "refer_only"
+    enforced_urgency: "seek_opd"
+    mandatory_confirmatory_test: "Excisional biopsy with histopathology"
+    rationale: "Zero-tolerance for autonomous dismissal or reassurance on potential malignancies."
+
+  cellulitis:
+    display_name: "Acute Bacterial Cellulitis"
+    autonomous_permitted: false
+    enforced_action: "refer_only"
+    enforced_urgency: "emergency"
+    mandatory_confirmatory_test: "Duplex ultrasound & blood cultures"
+    rationale: "Rapidly spreading systemic infection risking sepsis or DVT."
+
+  pemphigus_vulgaris:
+    display_name: "Pemphigus Vulgaris"
+    autonomous_permitted: false
+    enforced_action: "refer_only"
+    enforced_urgency: "emergency"
+    mandatory_confirmatory_test: "Direct Immunofluorescence (DIF)"
+    rationale: "Autoimmune bullous disease requiring immediate tertiary hospitalization."
+
+  other_unclear:
+    display_name: "Atypical / Reactive Dermatosis"
+    autonomous_permitted: false
+    enforced_action: "refer_only"
+    enforced_urgency: "seek_opd"
+    mandatory_confirmatory_test: "Comprehensive punch biopsy"
+    rationale: "Atypical morphology cannot be resolved without lab pathology."
+
+  # ── COMMON BENIGN INFLAMMATORY / INFECTIOUS DERMATOSES (Gated by Benchmark) ──
+  acne_vulgaris:
+    display_name: "Acne Vulgaris"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.88
+    max_expected_calibration_error: 0.08
+    mandatory_confirmatory_test: "Clinical dermoscopy"
+
+  eczema:
+    display_name: "Eczema (Atopic Dermatitis)"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.86
+    max_expected_calibration_error: 0.09
+    mandatory_confirmatory_test: "Patch testing / total IgE"
+
+  psoriasis:
+    display_name: "Psoriasis Vulgaris"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.88
+    max_expected_calibration_error: 0.08
+    mandatory_confirmatory_test: "Skin punch biopsy"
+
+  tinea:
+    display_name: "Tinea (Dermatophytosis)"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.85
+    max_expected_calibration_error: 0.09
+    mandatory_confirmatory_test: "10% KOH examination"
+
+  scabies:
+    display_name: "Scabies Infestation"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.90
+    max_expected_calibration_error: 0.07
+    mandatory_confirmatory_test: "Microscopic burrow scraping"
+
+  urticaria:
+    display_name: "Urticaria (Hives)"
+    autonomous_permitted: true
+    min_sensitivity_lower_ci_95: 0.87
+    max_expected_calibration_error: 0.08
+    mandatory_confirmatory_test: "ASST / CBC differential"
+

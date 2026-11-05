@@ -1,0 +1,47 @@
+# Secrets & Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Node & Frontend
+node_modules/
+apps/web/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+apps/web/dist/
+dist/
+build/
+
+# Database & Runtime Uploads
+*.db
+*.sqlite
+*.sqlite3
+qdoc.db
+services/api/qdoc.db
+services/api/uploads/
+services/uploads/
+uploads/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

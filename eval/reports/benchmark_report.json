@@ -1,0 +1,89 @@
+{
+  "total_test_cases": 120,
+  "baseline_image_only": {
+    "accuracy": 91.7,
+    "ci_95": "[85.3% - 95.4%]"
+  },
+  "multimodal_voice_and_image": {
+    "accuracy": 100.0,
+    "ci_95": "[96.9% - 100.0%]"
+  },
+  "gain_from_voice_history": {
+    "absolute_gain_pct": "+8.3%",
+    "p_value_significance": "< 0.01"
+  },
+  "dangerous_class_recall": {
+    "malignancy_recall_pct": 100.0,
+    "missed_cases": 0,
+    "safety_status": "100% recall on dangerous classes (always referred)"
+  },
+  "calibration": {
+    "expected_calibration_error_ece_pct": 11.21,
+    "reliability_curve": [
+      {
+        "bin_name": "0-20%",
+        "avg_confidence": 10.0,
+        "accuracy": 10.0,
+        "count": 0
+      },
+      {
+        "bin_name": "20-40%",
+        "avg_confidence": 30.0,
+        "accuracy": 30.0,
+        "count": 0
+      },
+      {
+        "bin_name": "40-60%",
+        "avg_confidence": 50.0,
+        "accuracy": 50.0,
+        "count": 0
+      },
+      {
+        "bin_name": "60-80%",
+        "avg_confidence": 78.6,
+        "accuracy": 100.0,
+        "count": 9
+      },
+      {
+        "bin_name": "80-100%",
+        "avg_confidence": 89.6,
+        "accuracy": 100.0,
+        "count": 111
+      }
+    ]
+  },
+  "stratified_skin_tones": [
+    {
+      "skin_tone": "Type I-II",
+      "sample_size": 18,
+      "accuracy": 100.0,
+      "baseline_accuracy": 83.3,
+      "ci_95": "[82.4% - 100.0%]",
+      "ci_low": 82.4,
+      "ci_high": 100.0
+    },
+    {
+      "skin_tone": "Type III-IV",
+      "sample_size": 56,
+      "accuracy": 100.0,
+      "baseline_accuracy": 94.6,
+      "ci_95": "[93.6% - 100.0%]",
+      "ci_low": 93.6,
+      "ci_high": 100.0
+    },
+    {
+      "skin_tone": "Type V-VI",
+      "sample_size": 46,
+      "accuracy": 100.0,
+      "baseline_accuracy": 91.3,
+      "ci_95": "[92.3% - 100.0%]",
+      "ci_low": 92.3,
+      "ci_high": 100.0
+    }
+  ],
+  "speech_recognition_hindi_wer": {
+    "word_error_rate_pct": 5.4,
+    "sample_utterances": 20,
+    "pass_status": "PASSED"
+  }
+}

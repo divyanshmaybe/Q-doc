@@ -1,0 +1,17 @@
+always_refer_red_flags:
+- possible_malignancy
+- rapid_spread
+- fever_with_rash
+- mucosal_involvement
+- infant_under_1_year
+- pregnancy
+mode: autonomous
+safety_constraints:
+  never_output:
+  - prescriptions
+  - drug_dosages
+  - definitive_cancer_dismissal
+thresholds:
+  image_quality_min: 0.5
+  top1_confidence_min: 0.45
+  top1_top2_margin_min: 0.12

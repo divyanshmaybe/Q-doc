@@ -1,0 +1,802 @@
+[
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_000.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_001.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_002.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_003.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_004.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_005.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_006.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_007.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_008.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_009.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_010.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_011.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_012.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_013.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_014.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\acne\\acne_015.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_000.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_001.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_002.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_003.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_004.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_005.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_006.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_007.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_008.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_009.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_010.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_011.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_012.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_013.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_014.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\eczema\\eczema_015.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_000.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_001.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_002.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_003.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_004.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_005.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_006.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_007.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_008.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_009.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_010.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_011.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_012.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_013.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_014.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\other_unclear\\other_unclear_015.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_000.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_001.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_002.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_003.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_004.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_005.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_006.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_007.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_008.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_009.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_010.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_011.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_012.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_013.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_014.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\possible_malignancy\\possible_malignancy_015.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_000.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_001.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_002.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_003.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_004.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_005.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_006.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_007.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_008.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_009.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_010.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_011.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_012.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_013.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_014.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\psoriasis\\psoriasis_015.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_000.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_001.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_002.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_003.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_004.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_005.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_006.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_007.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_008.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_009.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_010.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_011.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_012.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_013.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_014.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\scabies\\scabies_015.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_000.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_001.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_002.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_003.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_004.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_005.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_006.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_007.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_008.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_009.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_010.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_011.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_012.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_013.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_014.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\tinea\\tinea_015.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_000.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_001.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_002.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_003.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_004.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_005.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_006.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_007.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_008.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_009.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_010.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_011.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_012.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_013.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_014.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "train",
+    "filepath": "data\\clinical_images\\train\\urticaria\\urticaria_015.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\acne\\acne_val_000.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\acne\\acne_val_001.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\acne\\acne_val_002.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\acne\\acne_val_003.jpg",
+    "label": "acne"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\eczema\\eczema_val_000.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\eczema\\eczema_val_001.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\eczema\\eczema_val_002.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\eczema\\eczema_val_003.jpg",
+    "label": "eczema"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\other_unclear\\other_unclear_val_000.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\other_unclear\\other_unclear_val_001.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\other_unclear\\other_unclear_val_002.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\other_unclear\\other_unclear_val_003.jpg",
+    "label": "other_unclear"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\possible_malignancy\\possible_malignancy_val_000.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\possible_malignancy\\possible_malignancy_val_001.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\possible_malignancy\\possible_malignancy_val_002.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\possible_malignancy\\possible_malignancy_val_003.jpg",
+    "label": "possible_malignancy"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\psoriasis\\psoriasis_val_000.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\psoriasis\\psoriasis_val_001.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\psoriasis\\psoriasis_val_002.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\psoriasis\\psoriasis_val_003.jpg",
+    "label": "psoriasis"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\scabies\\scabies_val_000.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\scabies\\scabies_val_001.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\scabies\\scabies_val_002.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\scabies\\scabies_val_003.jpg",
+    "label": "scabies"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\tinea\\tinea_val_000.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\tinea\\tinea_val_001.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\tinea\\tinea_val_002.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\tinea\\tinea_val_003.jpg",
+    "label": "tinea"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\urticaria\\urticaria_val_000.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\urticaria\\urticaria_val_001.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\urticaria\\urticaria_val_002.jpg",
+    "label": "urticaria"
+  },
+  {
+    "split": "val",
+    "filepath": "data\\clinical_images\\val\\urticaria\\urticaria_val_003.jpg",
+    "label": "urticaria"
+  }
+]

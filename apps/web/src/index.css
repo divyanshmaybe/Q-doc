@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --ink: #eaeaea;
+  --accent: #f72585;
+  --teal: #4361ee;
+  --muted: #888888;
+  --border: #1f1f1f;
+  --panel-bg: #111111;
+  --strip-bg: #0f0f0f;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-head: 'Poppins', system-ui, sans-serif;
+  --electric: #4361ee;
+  --neon: #f72585;
+  --midnight: #0a0a0a;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(247,37,133,0.4); }
+
+/* ── Glass surfaces ── */
+.glass-panel {
+  background: rgba(17, 17, 17, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+.glass-panel-glow {
+  background: rgba(20, 20, 24, 0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(67, 97, 238, 0.35);
+  box-shadow: 0 0 30px -5px rgba(67, 97, 238, 0.25);
+}
+.glass-panel-danger {
+  background: rgba(26, 12, 18, 0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(247, 37, 133, 0.4);
+  box-shadow: 0 0 30px -5px rgba(247, 37, 133, 0.28);
+}
+
+/* ── Orb ambient canvas ── */
+.orb-ambient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 55%, rgba(67,97,238,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 55% at 55% 48%, rgba(247,37,133,0.06) 0%, transparent 65%),
+    var(--bg);
+}
+
+/* ── Scanner grid for camera ── */
+.scanner-grid {
+  background-size: 24px 24px;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+}

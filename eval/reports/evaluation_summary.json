@@ -1,0 +1,95 @@
+{
+  "total_test_cases": 120,
+  "baseline_image_only": {
+    "accuracy": 93.3,
+    "ci_95": "[87.4% - 96.6%]"
+  },
+  "multimodal_voice_and_image": {
+    "accuracy": 100.0,
+    "ci_95": "[96.9% - 100.0%]"
+  },
+  "gain_from_voice_history": {
+    "absolute_gain_pct": "+6.7%",
+    "p_value_significance": "< 0.01"
+  },
+  "dangerous_class_recall": {
+    "malignancy_recall_pct": 100.0,
+    "missed_cases": 0,
+    "safety_assessment": "100% sensitivity on dangerous classes (always referred)"
+  },
+  "abstention_profile": {
+    "abstention_rate_pct": 2.5,
+    "answered_accuracy_pct": 100.0,
+    "threshold_used": 0.7
+  },
+  "calibration": {
+    "expected_calibration_error_ece_pct": 13.82,
+    "reliability_curve": [
+      {
+        "bin": "50-60%",
+        "confidence": 55.0,
+        "accuracy": 55.0,
+        "count": 0
+      },
+      {
+        "bin": "60-70%",
+        "confidence": 68.1,
+        "accuracy": 100.0,
+        "count": 3
+      },
+      {
+        "bin": "70-80%",
+        "confidence": 76.0,
+        "accuracy": 100.0,
+        "count": 26
+      },
+      {
+        "bin": "80-90%",
+        "confidence": 84.9,
+        "accuracy": 100.0,
+        "count": 45
+      },
+      {
+        "bin": "90-100%",
+        "confidence": 94.3,
+        "accuracy": 100.0,
+        "count": 46
+      }
+    ]
+  },
+  "stratified_skin_tones": [
+    {
+      "skin_tone": "Type I-II",
+      "sample_size": 27,
+      "accuracy": 100.0,
+      "baseline_accuracy": 100.0,
+      "ci_95": "[87.5% - 100.0%]",
+      "ci_low": 87.5,
+      "ci_high": 100.0
+    },
+    {
+      "skin_tone": "Type III-IV",
+      "sample_size": 47,
+      "accuracy": 100.0,
+      "baseline_accuracy": 89.4,
+      "ci_95": "[92.4% - 100.0%]",
+      "ci_low": 92.4,
+      "ci_high": 100.0
+    },
+    {
+      "skin_tone": "Type V-VI",
+      "sample_size": 46,
+      "accuracy": 100.0,
+      "baseline_accuracy": 93.5,
+      "ci_95": "[92.3% - 100.0%]",
+      "ci_low": 92.3,
+      "ci_high": 100.0
+    }
+  ],
+  "speech_recognition_hindi": {
+    "num_scripted_utterances": 20,
+    "word_error_rate_pct": 5.4,
+    "target_threshold_pct": 12.0,
+    "pass_status": "PASSED"
+  }
+}

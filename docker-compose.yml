@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qdoc_api
+    ports:
+      - "8000:8000"
+    environment:
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - POLICY_CONFIG_PATH=config/policy.yaml
+      - DB_URL=sqlite:///./services/api/qdoc.db
+    volumes:
+      - ./config:/app/config
+      - ./services/api/uploads:/app/services/api/uploads
+      - ./eval/reports:/app/eval/reports
+    restart: unless-stopped
+
