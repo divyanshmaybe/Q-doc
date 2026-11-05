@@ -44,6 +44,9 @@ uploads/
 # Cache
 .cache/
 services/gateway/.cache/
+cloudflared.exe
+cloudflared.log
+cloudflared_out.log
 
 # OS & Editor
 .DS_Store
