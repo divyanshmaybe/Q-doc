@@ -76,10 +76,12 @@ class MultimodalDermatologistAgent:
                     "1. Directly inspect the lesion morphology (color, pattern, border, elevation, scale, follicular involvement, flexural distribution).\n"
                     "2. Formulate 3 to 5 candidate differential diagnoses (e.g. Acanthosis Nigricans, Vitiligo, Melasma, Psoriasis, Scabies, Eczema, Tinea, Rosacea, Lichen Planus, etc.).\n"
                     "3. Formulate an empathetic, conversational spoken question (2-3 sentences max) acknowledging what you observe in the photo and asking the first condition-specific discriminating question:\n"
+                    "   - If Acne / Folliculitis suspected: acknowledge the comedones/papules seen, and ask whether the spots feel painful or tender, and whether the skin is prone to excess oiliness or recent cosmetic/cleanser changes.\n"
                     "   - If Acanthosis Nigricans suspected: ask if the darkened skin feels velvety or thickened to the touch, and inquire about recent weight changes or personal/family history of high blood sugar or diabetes.\n"
                     "   - If Scabies suspected: ask about nocturnal itch surge and household members itching.\n"
-                    "   - If Tinea suspected: ask about expanding rings, sweating, pet contact, or gym/towel sharing.\n"
+                    "   - If Tinea / Fungal suspected: ask about expanding rings, sweating, pet contact, or gym/towel sharing.\n"
                     "   - If Psoriasis suspected: ask about silvery scaling, joint aches, or nail changes.\n"
+                    "   - If Eczema / Dermatitis suspected: ask about burning, dryness, or contact with new soaps, detergents, or jewelry.\n"
                     "4. NEVER prescribe drugs with dosages.\n"
                     f"Target Language: {'Hindi (Devanagari or natural Hindustani)' if is_hi else 'Clear Indian English'}"
                 )

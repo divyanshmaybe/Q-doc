@@ -158,16 +158,20 @@ class HeadDermatologistAgent:
             "   - If the patient has not yet provided a photo (has_photo_uploaded is false) and body_site/complaint is known:\n"
             "     Invite them to take a photo now so you can inspect visual patterns first: set 'ready_for_photo': true.\n"
             "     Spoken question: Acknowledge what they shared and ask for a clear photo of the lesion to guide targeted questions.\n"
-            "2. POST-PHOTO INVESTIGATION & NO QUESTIONING CAP:\n"
+            "2. POST-PHOTO THOROUGH INQUIRY (Do NOT conclude immediately):\n"
             "   - If a photo has already been uploaded (has_photo_uploaded is true):\n"
-            "     Evaluate the photo's visual morphology alongside the patient's responses.\n"
-            "     Identify 3 to 5 candidate differentials (e.g. Acanthosis Nigricans, Scabies, Eczema, Psoriasis, Tinea, Vitiligo, Melasma, Rosacea, etc.).\n"
-            "     Ask targeted, condition-specific discriminating questions to confirm the diagnosis (e.g., for Acanthosis Nigricans: ask about velvety texture, weight changes, diabetes/insulin resistance; for Scabies: nocturnal itch surge & household contacts; for Psoriasis: silvery micaceous scale & joint pains).\n"
-            "     You are permitted to ask AS MANY QUESTIONS AS NEEDED until you have clinical certainty. There is NO cap.\n"
+            "     Do NOT jump straight to the conclusion on the first reply after receiving the photo! A thorough clinical intake gathers comprehensive context first.\n"
+            "     Identify 3 to 5 candidate differentials (e.g. Acne Vulgaris, Acanthosis Nigricans, Scabies, Eczema, Psoriasis, Tinea, Vitiligo, Rosacea, etc.).\n"
+            "     Ask thoughtful, discriminating follow-up questions across consecutive turns to build a full clinical picture:\n"
+            "       * Turn A (Triggers & sensations): e.g. pain/tenderness, excessive oiliness, scaling, nocturnal itch, friction, sweating.\n"
+            "       * Turn B (Treatments & exposures): e.g. prior medicated face washes, OTC steroid creams (Betnovate/Quadriderm), cosmetic products, home remedies, shaving habits, diet/stress, pet contact.\n"
+            "       * Turn C (Systemic & differential rule-outs): e.g. facial flushing with heat/spices (Rosacea vs Acne), back/chest lesions, joint pain, family history.\n"
+            "     Set 'ready_for_verdict': false while you are still conducting this valuable history-taking.\n"
             "3. FINAL VERDICT & CARE PLAN:\n"
-            "   - When you have sufficient clinical certainty (diagnostic_confidence >= 0.80 or key discriminating clues answered):\n"
-            "     Set 'ready_for_verdict': true.\n"
-            "     In 'agent_question', deliver the complete clinical verdict: the confirmed diagnosis, the underlying mechanism/cause, first-line evidence-based active ingredients/lotions, daily hygiene protocol, and clinical red flags.\n"
+            "   - Set 'ready_for_verdict': true ONLY when:\n"
+            "     (a) You have asked sufficient discriminating follow-up questions (at least 2 to 3 turns after photo was uploaded), OR\n"
+            "     (b) The patient explicitly asks for the diagnosis/plan (e.g. 'what is it?', 'what do I have?', 'tell me treatment', 'what should I do?').\n"
+            "     When ready_for_verdict is true, deliver the full verdict: the confirmed diagnosis, the underlying mechanism/cause, first-line evidence-based active ingredients/lotions, daily hygiene protocol, and clinical red flags.\n"
             "4. SAFETY CONSTRAINTS:\n"
             "   - Common benign conditions must receive direct provisional diagnosis and self-care plans. Only refer to doctor for true red flags (malignancy, rapid spreading rash with fever).\n"
             "   - NEVER prescribe drugs with exact dosages (e.g. no '500mg' or 'twice daily'). Keep language warm and natural.\n"
@@ -206,7 +210,30 @@ Analyze the case and return JSON ONLY with this schema:
                 if not has_photo and slots.body_site and slots.turn_count >= 1:
                     ready_photo = True
 
-                ready_verdict = bool(res.get("ready_for_verdict", False)) or (has_photo and slots.diagnostic_confidence >= 0.80)
+                # Track turns elapsed after photo intake
+                post_photo_turns = 0
+                if has_photo:
+                    post_photo_turns = slots.condition_specific_history.get("post_photo_turns", 0) + 1
+                    slots.condition_specific_history["post_photo_turns"] = post_photo_turns
+
+                # Did the patient explicitly ask for diagnosis or conclusion?
+                meaning_lower = normalized_intent.get("clean_meaning", "").lower()
+                patient_wants_verdict = any(w in meaning_lower for w in [
+                    "what is it", "what do i have", "tell me diagnosis", "give diagnosis",
+                    "what should i do", "what's the verdict", "cure", "treatment",
+                    "summary", "what is this", "diagnose", "tell me what", "निदान", "क्या बीमारी", "इलाज क्या"
+                ])
+
+                # Determine if consultation is ready for final conclusion:
+                # Do NOT wrap up immediately on the first post-photo turn unless explicitly requested!
+                llm_ready = bool(res.get("ready_for_verdict", False))
+                if patient_wants_verdict:
+                    ready_verdict = True
+                elif has_photo and post_photo_turns < 3 and not patient_wants_verdict:
+                    # Keep dialogue open to ask more discriminating clinical questions
+                    ready_verdict = False
+                else:
+                    ready_verdict = llm_ready and (slots.diagnostic_confidence >= 0.85)
 
                 # Cap override if explicitly configured
                 if self.max_turns is not None and slots.turn_count >= self.max_turns:
@@ -259,8 +286,10 @@ Analyze the case and return JSON ONLY with this schema:
             )
 
         agent_msg = f"{ask}"
-        ready = bool(slots.diagnostic_confidence >= 0.80)
+        post_photo_turns = slots.condition_specific_history.get("post_photo_turns", 0)
+        ready = bool(slots.diagnostic_confidence >= 0.85 and post_photo_turns >= 2)
         slots.is_complete = ready
+        slots.is_final_verdict_ready = ready
         return slots, sanitize_safety_constraints(agent_msg), ready, None
 
     def _get_relevant_knowledge(self, slots: ClinicalIntakeSlots) -> str:
