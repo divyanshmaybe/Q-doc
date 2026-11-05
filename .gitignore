@@ -26,7 +26,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-apps/web/dist/
+# Keep apps/web/dist tracked so servers without node/npm can serve prebuilt assets
+!apps/web/dist/
 dist/
 build/
 
