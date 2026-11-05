@@ -68,20 +68,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 <p>
                   It doesn’t have to be this way. Many common conditions can be screened reliably
-                  before a patient ever reaches a doctor. A well-designed first filter — one that listens,
-                  checks symptoms, inspects lesion imagery, and routes intelligently — can safely handle
+                  before a patient ever reaches a doctor. A well-designed first filter that listens,
+                  checks symptoms, inspects lesion imagery, and routes intelligently can safely handle
                   routine OPD load without replacing clinical judgment.
                 </p>
 
                 <p>
                   Q-Doc is built to be that filter. By screening patients at the door, it lifts a massive
-                  burden off our doctors so they can focus on critical cases — while sparing patients with
+                  burden off our doctors so they can focus on critical cases while sparing patients with
                   non-serious conditions from wasting hours in a waiting room.
                 </p>
 
                 <p>
                   Powered by advanced multimodal voice &amp; vision models across regional languages,
-                  patients don’t need to be tech-savvy — they just speak in their mother tongue and take a photo.
+                  patients don’t need to be tech-savvy as they just speak in their mother tongue and take a photo.
                 </p>
               </div>
 
@@ -211,7 +211,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h2>
               <p className="text-sm text-[#888888] leading-relaxed">
                 India’s doctor shortage is severe enough that even a basic checkup can mean hours
-                of waiting — and that’s not only a rural issue. <strong className="text-[#eaeaea] font-semibold">Urban government
+                of waiting, and that is not only a rural issue. <strong className="text-[#eaeaea] font-semibold">Urban government
                 hospitals are equally understaffed relative to demand.</strong> Routine and urgent cases
                 funnel through the same overwhelmed system, discouraging people from seeking help until
                 a symptom becomes too serious to ignore.
@@ -245,7 +245,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               A patient with a manageable, common condition waits alongside someone in genuine distress, and neither receives the attention they deserve.
             </p>
             <p className="text-sm text-[#888888] italic border-l-2 border-[#1f1f1f] pl-4">
-              “We’ve stood in that queue too — and that’s why we’re building this.”<br />
+              “We’ve stood in that queue too, and that is why we are building this.”<br />
               <strong className="not-italic text-[#eaeaea]">Divyansh Soni</strong>, Founder · Q-Doc, founded 2026
             </p>
           </div>
@@ -334,7 +334,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </h3>
                   <p className="text-sm text-[#888888] leading-relaxed">
                     No app, no form, no appointment. The patient describes how they’re feeling,
-                    out loud, in their own language — Hindi, English, or whichever regional tongue
+                    out loud, in their own language such as Hindi, English, or whichever regional tongue
                     they think in. The kiosk listens and understands acoustic nuance.
                   </p>
                 </div>
@@ -391,7 +391,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h3>
               <p className="text-sm text-[#888888] leading-relaxed">
                 Government systems like Smart Doctor CDSS and eSanjeevani are built for the
-                provider’s side of care — decision support for clinicians,
+                provider’s side of care, offering decision support for clinicians and
                 teleconsultation for registered patients. Several kiosk makers already screen
                 well, but mostly through touchscreens and structured forms, in a handful of
                 languages, assuming a patient who can read, type, and navigate a menu.
@@ -405,7 +405,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h3>
               <p className="text-sm text-[#eaeaea] leading-relaxed">
                 Voice-native, in the patient’s own regional language, combined with
-                multimodal lesion vision — reaching the last-mile public locations
+                multimodal lesion vision to reach the last-mile public locations
                 existing government infrastructure hasn’t fully covered yet. The interface
                 is a conversation, not a form. Patients describe symptoms in their own words;
                 the system understands the way people actually talk about feeling unwell.
@@ -470,7 +470,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h3>
               <p className="text-sm text-[#888888] leading-relaxed mb-3">
                 Whether you run a government hospital, manage public health infrastructure, or
-                are a researcher interested in last-mile healthcare access — reach out.
+                are a researcher interested in last-mile healthcare access, please reach out.
               </p>
               <p className="text-sm text-[#888888] leading-relaxed mb-5">
                 We are actively looking for pilot partners across India.
@@ -493,7 +493,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <footer className="py-12 bg-[#0a0a0a]">
         <div className="max-w-[1080px] mx-auto px-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <p className="text-xs text-[#888888] leading-relaxed">
-            Early-stage — built by a team that’s stood in that queue too. Founded 2026.<br />
+            Early-stage, built by a team that has stood in that queue too. Founded 2026.<br />
             Supported by <strong className="text-[#eaeaea]">IIT BHU Incubation Centre</strong>.
           </p>
           <a
