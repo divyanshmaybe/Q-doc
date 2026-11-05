@@ -42,6 +42,14 @@ def process_intake_turn(
     session_lang = sess.get("language", "en-IN")
     req_lang = req.language or session_lang
 
+    # Reconstruct current slots from history
+    current_slots = ClinicalIntakeSlots(primary_language=req_lang)
+    for t in turns:
+        if t.get("slots"):
+            for k, v in t["slots"].items():
+                if hasattr(current_slots, k) and v is not None:
+                    setattr(current_slots, k, v)
+
     # 1. Transcript resolution
     transcript = req.transcript.strip()
     if not transcript and req.audio_base64:
@@ -49,12 +57,27 @@ def process_intake_turn(
         try:
             audio_bytes = base64.b64decode(req.audio_base64)
             stt_res = stt_adapter.transcribe(audio_bytes, language_code=req_lang)
-            transcript = stt_res.get("transcript", "")
+            transcript = stt_res.get("transcript", "").strip()
         except Exception:
             transcript = ""
 
+    # If no speech was captured (e.g. ambient silence or pause), respond politely without error
     if not transcript:
-        raise HTTPException(status_code=400, detail="Transcript or valid audio input required")
+        is_hi = "hi" in req_lang.lower()
+        fallback_msg = (
+            "माफ़ कीजिए, मुझे आपकी आवाज़ स्पष्ट नहीं आई। कृपया अपनी त्वचा के लक्षणों के बारे में दोबारा बताएं या नीचे लिखें।"
+            if is_hi
+            else "I didn't catch that clearly. Please tell me about your skin symptoms or type them below."
+        )
+        return {
+            "session_id": session_id,
+            "agent_response": fallback_msg,
+            "slots": current_slots.model_dump(),
+            "turn_index": turn_idx,
+            "language": req_lang,
+            "audio": None,
+            "is_ready_for_photo": False
+        }
 
     # Dynamic Multilingual Language Detection & Auto-Switching
     # Switches automatically to Hindi if user speaks Hindi (Devanagari or Hinglish)
@@ -63,13 +86,6 @@ def process_intake_turn(
     if lang != sess.get("language"):
         DatabaseRepo.update_session_language(session_id, lang)
 
-    # Reconstruct current slots from history with the active language
-    current_slots = ClinicalIntakeSlots(primary_language=lang)
-    for t in turns:
-        if t.get("slots"):
-            for k, v in t["slots"].items():
-                if hasattr(current_slots, k) and v is not None:
-                    setattr(current_slots, k, v)
     current_slots.primary_language = lang
 
     # 2. Log patient turn

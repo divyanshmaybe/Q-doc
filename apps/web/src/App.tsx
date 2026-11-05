@@ -296,7 +296,10 @@ export const App: React.FC = () => {
   const handleFinalTranscript = useCallback(
     async (text: string, audioBase64?: string) => {
       const trimmed = text.trim();
-      if (!trimmed && !audioBase64) return;
+      if (!trimmed && !audioBase64) {
+        setAgentPhase("idle");
+        return;
+      }
       if (viewRef.current !== "voice") return;
 
       activeTurnTokenRef.current += 1;

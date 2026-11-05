@@ -27,8 +27,25 @@ class SarvamSTTAdapter(BaseSTTAdapter):
         }
 
         try:
+            # Detect audio type from header magic bytes
+            ext = "wav"
+            mime = "audio/wav"
+            if len(audio_bytes) > 4:
+                if audio_bytes[:4] == b'\x1aE\xdf\xa3':
+                    ext = "webm"
+                    mime = "audio/webm"
+                elif audio_bytes[:4] == b'OggS':
+                    ext = "ogg"
+                    mime = "audio/ogg"
+                elif audio_bytes[:3] == b'ID3' or audio_bytes[:2] == b'\xff\xfb':
+                    ext = "mp3"
+                    mime = "audio/mpeg"
+                elif b'ftyp' in audio_bytes[:12]:
+                    ext = "mp4"
+                    mime = "audio/mp4"
+
             files = {
-                "file": ("audio.wav", audio_bytes, "audio/wav")
+                "file": (f"audio.{ext}", audio_bytes, mime)
             }
             data = {
                 "language_code": language_code,

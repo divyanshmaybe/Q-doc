@@ -100,15 +100,23 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
       }
     }
 
-    // Submit if we have either text transcript OR recorded audio
-    if (textToSubmit || recordedBase64) {
+    // Only submit if we have actual recognized speech, or if browser lacks Web Speech API and has raw audio
+    const hasBrowserSTT =
+      typeof window !== "undefined" &&
+      Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (textToSubmit) {
       isFlushedRef.current = true;
       console.log("[useVoiceEngine] Submitting turn -> Text:", textToSubmit, "Audio size:", recordedBase64.length);
       onFinalTranscriptRef.current(textToSubmit, recordedBase64 || undefined);
-      latestSpeechRef.current = "";
-      setInterimTranscript("");
-      audioChunksRef.current = [];
+    } else if (!hasBrowserSTT && recordedBase64 && recordedBase64.length > 3000) {
+      isFlushedRef.current = true;
+      console.log("[useVoiceEngine] Submitting audio fallback turn -> Audio size:", recordedBase64.length);
+      onFinalTranscriptRef.current("", recordedBase64);
     }
+    latestSpeechRef.current = "";
+    setInterimTranscript("");
+    audioChunksRef.current = [];
   }, []);
 
   // ── Meter loop: sample AnalyserNode and push audioLevel ──
