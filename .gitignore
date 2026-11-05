@@ -40,8 +40,13 @@ services/api/uploads/
 services/uploads/
 uploads/
 
+# Cache
+.cache/
+services/gateway/.cache/
+
 # OS & Editor
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+

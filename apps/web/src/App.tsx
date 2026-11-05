@@ -12,6 +12,7 @@ import {
   Send,
   CornerDownLeft,
   ArrowLeft,
+  Volume2,
 } from "lucide-react";
 
 import { AICoreVisualizer, AgentPhase } from "./components/AICoreVisualizer";
@@ -32,6 +33,26 @@ import {
   listAllBriefs,
   ClinicianBriefItem,
 } from "./services/api";
+
+const DEFAULT_WELCOME_EN =
+  "Hello, I am Q-Doc, your skin screening assistant. Please note: I am a screening aid, not a doctor. What skin issue are you experiencing, and where on your body is it located?";
+const DEFAULT_WELCOME_HI =
+  "नमस्ते, मैं क्यू-डॉक हूँ, आपका त्वचा स्क्रीनिंग सहायक। कृपया ध्यान दें: यह एक स्क्रीनिंग सहायता है, डॉक्टर नहीं। बताइए, आपकी त्वचा में क्या परेशानी हो रही है और यह किस अंग पर है?";
+
+const b64ToBlobUrl = (base64: string): string => {
+  try {
+    const cleanB64 = base64.replace(/^data:audio\/\w+;base64,/, "");
+    const binary = atob(cleanB64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "audio/wav" });
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    return "data:audio/wav;base64," + base64;
+  }
+};
 
 // ─────────────────────────────────────────────
 //  App — Voice-First Minimalist Ambient Interface
@@ -54,8 +75,17 @@ export const App: React.FC = () => {
   const [sessionLang, setSessionLang] = useState<string>("en-IN");
   const sessionLangRef = useRef<string>("en-IN");
 
-  const [agentMessage, setAgentMessage] = useState<string | null>(null);
-  const [latestAudioB64, setLatestAudioB64] = useState<string | null>(null);
+  const [agentMessage, setAgentMessage] = useState<string | null>(DEFAULT_WELCOME_EN);
+  const agentMessageRef = useRef<string | null>(DEFAULT_WELCOME_EN);
+  const [latestAudioB64, setLatestAudioB64] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("qdoc_welcome_b64_en-IN") || null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const latestAudioB64Ref = useRef<string | null>(latestAudioB64);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [lastUserSpeech, setLastUserSpeech] = useState<string | null>(null);
   const [slots, setSlots] = useState<Record<string, any>>({});
   const [photoReady, setPhotoReady] = useState(false);
@@ -154,20 +184,39 @@ export const App: React.FC = () => {
       } catch (_) {}
     }
 
+    setAgentPhase("speaking");
+
     // 2. Play Sarvam synthesized audio if present
-    if (audioB64) {
+    const b64 = audioB64 || latestAudioB64Ref.current;
+    if (b64) {
       try {
-        const audio = new Audio("data:audio/wav;base64," + audioB64);
+        const audioUrl = b64ToBlobUrl(b64);
+        const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
-        audio.play().catch((err) => {
-          console.warn("[App] Audio play error:", err);
-          // Only fallback if not an AbortError caused by stopping previous audio
-          if (err.name !== "AbortError") {
-            speakSynthesisFallback(text);
-          }
-        });
+        audio.onended = () => {
+          setAgentPhase("idle");
+          setAutoplayBlocked(false);
+        };
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setAutoplayBlocked(false);
+            })
+            .catch((err) => {
+              console.warn("[App] Audio play error / autoplay blocked:", err);
+              if (err.name === "NotAllowedError") {
+                setAutoplayBlocked(true);
+              }
+              if (err.name !== "AbortError") {
+                speakSynthesisFallback(text);
+              }
+            });
+        }
         return;
-      } catch (_) {}
+      } catch (err) {
+        console.warn("[App] Error creating Audio object:", err);
+      }
     }
 
     // 3. Fallback to browser SpeechSynthesis only if no audioB64 provided
@@ -270,7 +319,9 @@ export const App: React.FC = () => {
 
         setAgentPhase("speaking");
         setAgentMessage(res.agent_response);
+        agentMessageRef.current = res.agent_response;
         setLatestAudioB64(res.audio?.audio_base64 || null);
+        latestAudioB64Ref.current = res.audio?.audio_base64 || null;
         playSpeech(res.agent_response, res.audio?.audio_base64);
 
         if (res.verdict_data) {
@@ -332,8 +383,17 @@ export const App: React.FC = () => {
       const modeData = await getAdminMode();
       if (modeData?.mode) setMode(modeData.mode);
     } catch (_) {}
-    // Initialize session quietly WITHOUT auto-speaking on page load or reload
-    await handleNewSession(undefined, false);
+
+    // Check if this navigation was a page reload (F5 / Refresh)
+    const isReload = typeof window !== "undefined" && (
+      (window.performance?.getEntriesByType?.('navigation')?.[0] as any)?.type === 'reload' ||
+      (window.performance as any)?.navigation?.type === 1
+    );
+
+    // If reload: NEVER auto-speak!
+    // If directly arriving via #demo link (e.g. from visiting page): speak!
+    const isDirectDemoLaunch = !isReload && typeof window !== "undefined" && window.location.hash.includes("demo");
+    await handleNewSession(undefined, isDirectDemoLaunch);
   };
 
   const handleNewSession = async (langOverride?: string, shouldSpeak: boolean = false) => {
@@ -343,10 +403,23 @@ export const App: React.FC = () => {
     setPhotoReady(false);
     setUploadedPhotoId(null);
     setVerdictData(null);
-    setAgentMessage(null);
-    setAgentPhase(shouldSpeak ? "connecting" : "idle");
 
     const targetLang = langOverride || sessionLangRef.current || sessionLang;
+    const defaultMsg = targetLang.toLowerCase().includes("hi") ? DEFAULT_WELCOME_HI : DEFAULT_WELCOME_EN;
+    setAgentMessage(defaultMsg);
+    agentMessageRef.current = defaultMsg;
+
+    // Load cached audio from localStorage if available
+    try {
+      const cachedB64 = localStorage.getItem("qdoc_welcome_b64_" + targetLang);
+      if (cachedB64) {
+        setLatestAudioB64(cachedB64);
+        latestAudioB64Ref.current = cachedB64;
+      }
+    } catch (_) {}
+
+    setAgentPhase(shouldSpeak ? "connecting" : "idle");
+
     try {
       const res = await startSession(targetLang, mode);
       setSessionId(res.session_id);
@@ -357,12 +430,19 @@ export const App: React.FC = () => {
       }
       setSlots(res.slots || {});
       setAgentMessage(res.agent_message);
+      agentMessageRef.current = res.agent_message;
       setLatestAudioB64(res.audio?.audio_base64 || null);
+      latestAudioB64Ref.current = res.audio?.audio_base64 || null;
+
+      // Save to localStorage for instant subsequent launches
+      if (res.audio?.audio_base64) {
+        try {
+          localStorage.setItem("qdoc_welcome_b64_" + (res.language || targetLang), res.audio.audio_base64);
+        } catch (_) {}
+      }
 
       if (shouldSpeak) {
-        setAgentPhase("speaking");
         playSpeech(res.agent_message, res.audio?.audio_base64);
-        setTimeout(() => setAgentPhase("idle"), 3000);
       } else {
         setAgentPhase("idle");
       }
@@ -377,13 +457,18 @@ export const App: React.FC = () => {
   const handleLaunchDemo = () => {
     setView("voice");
     if (typeof window !== "undefined") window.location.hash = "#demo";
-    // Only speak greeting now that the user explicitly clicked the demo button!
-    if (agentMessage) {
-      setAgentPhase("speaking");
-      playSpeech(agentMessage, latestAudioB64);
-      setTimeout(() => setAgentPhase("idle"), 3000);
-    } else {
-      handleNewSession(undefined, true);
+
+    const targetLang = sessionLangRef.current || sessionLang;
+    const defaultMsg = targetLang.toLowerCase().includes("hi") ? DEFAULT_WELCOME_HI : DEFAULT_WELCOME_EN;
+    const msg = agentMessageRef.current || agentMessage || defaultMsg;
+    const b64 = latestAudioB64Ref.current || latestAudioB64;
+
+    // Direct synchronous speech launch inside the user's click gesture
+    playSpeech(msg, b64);
+
+    // If session is still initializing or missing, ensure it starts in parallel
+    if (!sessionIdRef.current) {
+      handleNewSession(undefined, false);
     }
   };
 
@@ -425,11 +510,11 @@ export const App: React.FC = () => {
       if (photoRes.agent_question) {
         const nextMsg = photoRes.agent_question;
         setAgentMessage(nextMsg);
+        agentMessageRef.current = nextMsg;
         setLatestAudioB64(photoRes.audio?.audio_base64 || null);
-        setAgentPhase("speaking");
+        latestAudioB64Ref.current = photoRes.audio?.audio_base64 || null;
         playSpeech(nextMsg, photoRes.audio?.audio_base64);
         setPhotoReady(false);
-        setTimeout(() => setAgentPhase("idle"), 4000);
       } else {
         // Fallback or immediate analysis
         setAgentMessage("Computing differential diagnosis & Bayesian posteriors...");
@@ -437,10 +522,10 @@ export const App: React.FC = () => {
         setVerdictData(analysisRes);
         const msg = analysisRes.policy_decision.spoken_patient_message;
         setAgentMessage(msg);
+        agentMessageRef.current = msg;
         setLatestAudioB64(analysisRes.audio?.audio_base64 || null);
-        setAgentPhase("speaking");
+        latestAudioB64Ref.current = analysisRes.audio?.audio_base64 || null;
         playSpeech(msg, analysisRes.audio?.audio_base64);
-        setTimeout(() => setAgentPhase("idle"), 4000);
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Analysis failed.");
@@ -485,6 +570,13 @@ export const App: React.FC = () => {
 
   // ── Orb tap handler ──
   const handleOrbTap = () => {
+    if (autoplayBlocked) {
+      setAutoplayBlocked(false);
+      const msg = agentMessageRef.current || agentMessage;
+      const b64 = latestAudioB64Ref.current || latestAudioB64;
+      if (msg) playSpeech(msg, b64);
+      return;
+    }
     if (agentPhase === "idle" || agentPhase === "error") {
       voice.startListening();
     } else if (agentPhase === "listening") {
@@ -669,6 +761,27 @@ export const App: React.FC = () => {
                 onTap={handleOrbTap}
                 disabled={agentPhase === "thinking" || agentPhase === "connecting"}
               />
+
+              {/* Autoplay unlock prompt (if browser blocked sound) */}
+              <AnimatePresence>
+                {autoplayBlocked && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={() => {
+                      setAutoplayBlocked(false);
+                      const msg = agentMessageRef.current || agentMessage;
+                      const b64 = latestAudioB64Ref.current || latestAudioB64;
+                      if (msg) playSpeech(msg, b64);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#f72585] text-white text-xs font-semibold shadow-[0_2px_14px_rgba(247,37,133,0.4)] hover:bg-[#d4186e] transition animate-pulse cursor-pointer -mt-2 z-20"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Click here to enable voice greeting</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
 
               {/* AGENT TRANSCRIPT (floating below orb) */}
               <AgentTranscript

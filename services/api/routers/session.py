@@ -20,6 +20,43 @@ from services.gateway.tts import SarvamTTSAdapter
 router = APIRouter(tags=["session"])
 tts_adapter = SarvamTTSAdapter()
 
+# In-memory and disk cache for instantaneous welcome greeting audio
+import os, json
+_WELCOME_AUDIO_CACHE: Dict[str, Dict[str, Any]] = {}
+_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "gateway", ".cache")
+os.makedirs(_CACHE_DIR, exist_ok=True)
+
+def _get_cached_welcome_audio(text: str, language_code: str) -> Dict[str, Any]:
+    global _WELCOME_AUDIO_CACHE
+    lang_key = "hi-IN" if "hi" in language_code.lower() else "en-IN"
+    
+    # 1. Check in-memory
+    if lang_key in _WELCOME_AUDIO_CACHE and _WELCOME_AUDIO_CACHE[lang_key].get("audio_base64"):
+        return _WELCOME_AUDIO_CACHE[lang_key]
+
+    # 2. Check disk cache
+    cache_file = os.path.join(_CACHE_DIR, f"welcome_{lang_key.replace('-', '_')}.json")
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if data.get("audio_base64"):
+                    _WELCOME_AUDIO_CACHE[lang_key] = data
+                    return data
+        except Exception as e:
+            print(f"[SessionRouter] Could not read disk audio cache: {e}")
+
+    # 3. Synthesize via adapter
+    speech_res = tts_adapter.synthesize(text, language_code=lang_key)
+    if speech_res.get("success") and speech_res.get("audio_base64"):
+        _WELCOME_AUDIO_CACHE[lang_key] = speech_res
+        try:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(speech_res, f)
+        except Exception as e:
+            print(f"[SessionRouter] Could not write disk audio cache: {e}")
+    return speech_res
+
 class StartSessionRequest(BaseModel):
     language: str = "en-IN"
     mode: Optional[str] = None
@@ -57,8 +94,8 @@ def start_session(req: StartSessionRequest):
     initial_slots = ClinicalIntakeSlots(primary_language=req.language, age=req.age, sex=req.sex)
     DatabaseRepo.log_turn(session_id, 0, "agent", welcome_text, initial_slots.model_dump_json())
 
-    # Speech synthesis
-    speech_res = tts_adapter.synthesize(welcome_text, language_code=req.language)
+    # Speech synthesis with instantaneous cache
+    speech_res = _get_cached_welcome_audio(welcome_text, req.language)
 
     return {
         "session_id": session_id,
