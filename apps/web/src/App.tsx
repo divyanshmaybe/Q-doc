@@ -863,7 +863,7 @@ export const App: React.FC = () => {
       </AnimatePresence>
 
       {/* ── MAIN CONTENT ── */}
-      <main className={`relative z-10 flex-1 flex flex-col items-center ${view === "clinician" ? "justify-start w-full min-h-0 overflow-y-auto py-4" : "justify-center"} px-4`}>
+      <main className={`relative z-10 flex-1 flex flex-col items-center ${view === "clinician" ? "justify-start w-full min-h-0 overflow-y-auto py-4" : "justify-center overflow-y-auto py-4 w-full min-h-0"} px-4`}>
         <AnimatePresence mode="wait">
           {/* ════════════════════════════════════════════ */}
           {/*  VOICE VIEW — Ambient AI Core               */}
