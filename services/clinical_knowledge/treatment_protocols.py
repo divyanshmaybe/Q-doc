@@ -254,3 +254,417 @@ def get_treatment_guidance(condition: Any, lang: str = "en") -> str:
             f"3. Clinical escalation: {when}"
         )
 
+
+STRUCTURED_CLINICIAN_PRESCRIPTIONS: Dict[str, Dict[str, Any]] = {
+    "tinea": {
+        "condition_key": "tinea",
+        "display_name": "Tinea Corporis / Cruris (Dermatophytosis)",
+        "icd10": "B35.4, B35.6",
+        "guideline_basis": "IADVL Consensus Guidelines / AAD Practice Guidelines",
+        "diagnostic_summary": "Erythematous annular plaque with elevated, active, scaling borders and central clearing; verified superficial fungal etiology.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Luliconazole Cream",
+                "strength": "1% w/w",
+                "route": "Topical",
+                "dosage_schedule": "Apply once daily (OD) over lesion extending 2 cm beyond advancing border",
+                "duration": "2 - 3 weeks (continue 7 days post clinical resolution)",
+                "purpose": "First-line topical fungicidal imidazole for dermatophytes",
+                "alternatives": "Terbinafine 1% cream OD or Sertaconazole 2% cream BD"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Clotrimazole / Tolnaftate Dusting Powder",
+                "strength": "1% w/w",
+                "route": "Topical Powder",
+                "dosage_schedule": "Dust over groin/intertriginous skin folds twice daily",
+                "duration": "Duration of therapy",
+                "purpose": "Absorbs excess moisture and prevents maceration/recurrence"
+            },
+            {
+                "drug_name": "Levocetirizine Tablet",
+                "strength": "5 mg",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet at bedtime PRN",
+                "duration": "5 - 7 days",
+                "purpose": "Symptomatic control of pruritus"
+            }
+        ],
+        "refractory_second_line": "If extensive (>3 lesions) or unresponsive to topical therapy: Tab Terbinafine 250 mg OD PO for 2-4 weeks OR Tab Itraconazole 100 mg BD PO with meals for 1-2 weeks. (Baseline LFT recommended).",
+        "critical_precautions": [
+            "STRICT WARNING: Do NOT prescribe or apply topical corticosteroids (e.g. Clobetasol, Betamethasone, Quadriderm/Fourderm). Corticosteroids suppress local immunity, leading to Tinea Incognito and steroid-resistant widespread dermatophytosis.",
+            "Advise patient to complete the full treatment course even if visible erythema clears earlier.",
+            "Maintain strict personal hygiene: wash towels and clothing in hot water (>50°C), dry under direct sunlight, and wear loose-fitting cotton clothing."
+        ]
+    },
+
+    "scabies": {
+        "condition_key": "scabies",
+        "display_name": "Scabies Infestation (Sarcoptes scabiei)",
+        "icd10": "B86",
+        "guideline_basis": "CDC / IADVL / British Association of Dermatologists Guidelines",
+        "diagnostic_summary": "Intensely pruritic serpiginous burrows and excoriated papules in web spaces, wrists, axillae, and genitalia with nocturnal pruritus surge.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Permethrin Dermal Cream",
+                "strength": "5% w/w",
+                "route": "Topical",
+                "dosage_schedule": "Thoroughly apply from chin/neck down to toes and soles; leave on for 8 - 14 hours then shower off. Mandatory repeat in 7 days.",
+                "duration": "Day 1 and Day 7 application",
+                "purpose": "First-line scabicidal neurotoxin targeting mite nervous system",
+                "alternatives": "Benzyl Benzoate 25% lotion or Crotamiton 10% cream"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Hydroxyzine Tablet",
+                "strength": "25 mg",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet at bedtime for nocturnal itch",
+                "duration": "7 - 10 days",
+                "purpose": "Sedating H1-blocker for intense post-scabetic allergic pruritus"
+            },
+            {
+                "drug_name": "Calamine Lotion",
+                "strength": "Standard",
+                "route": "Topical",
+                "dosage_schedule": "Apply generously to itchy patches twice daily",
+                "duration": "As needed",
+                "purpose": "Soothing cutaneous anti-pruritic relief"
+            }
+        ],
+        "refractory_second_line": "Tab Ivermectin 200 mcg/kg single oral dose PO with fatty meal, repeated on Day 14. Essential for institutional outbreaks or crusted (Norwegian) scabies.",
+        "critical_precautions": [
+            "EPIDEMIOLOGICAL MANDATE: All cohabitants, bedmates, and close household contacts MUST be treated simultaneously on the same night, regardless of whether they have active symptoms.",
+            "Decontamination: Wash all clothing, sheets, and towels used in past 4 days in hot water (>50°C) or seal in plastic bags for 72 hours.",
+            "In infants < 2 months, permethrin is contraindicated; use Precipitated Sulfur 5-10% in petrolatum for 3 consecutive nights."
+        ]
+    },
+
+    "acne": {
+        "condition_key": "acne",
+        "display_name": "Acne Vulgaris",
+        "icd10": "L70.0",
+        "guideline_basis": "AAD Guidelines for the Management of Acne Vulgaris",
+        "diagnostic_summary": "Polymorphic eruption of open/closed comedones, erythematous inflammatory papules, and pustules on pilosebaceous rich areas.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Benzoyl Peroxide Gel",
+                "strength": "2.5% - 5%",
+                "route": "Topical",
+                "dosage_schedule": "Apply thin film once daily in the evening to affected zones",
+                "duration": "8 - 12 weeks",
+                "purpose": "Bactericidal against C. acnes; non-antibiotic so prevents bacterial resistance",
+                "alternatives": "Azelaic Acid 10% - 20% gel/cream"
+            },
+            {
+                "drug_name": "Adapalene Gel",
+                "strength": "0.1%",
+                "route": "Topical",
+                "dosage_schedule": "Apply a pea-sized amount to entire face at bedtime",
+                "duration": "12 weeks / ongoing maintenance",
+                "purpose": "Topical retinoid; normalizes follicular desquamation and prevents microcomedones",
+                "alternatives": "Tretinoin 0.025% cream or Tazarotene 0.05% gel"
+            },
+            {
+                "drug_name": "Clindamycin Gel",
+                "strength": "1%",
+                "route": "Topical",
+                "dosage_schedule": "Apply in the morning (co-prescribed with Benzoyl Peroxide)",
+                "duration": "8 - 12 weeks",
+                "purpose": "Suppresses inflammatory papules and Cutibacterium bacterial colonization",
+                "alternatives": "Nadifloxacin 1% cream"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Broad-Spectrum Oil-Free Sunscreen",
+                "strength": "SPF 30+ / PA+++",
+                "route": "Topical",
+                "dosage_schedule": "Apply every morning 20 minutes before sun exposure",
+                "duration": "Daily ongoing",
+                "purpose": "Prevents photosensitivity and post-inflammatory hyperpigmentation (PIH)"
+            }
+        ],
+        "refractory_second_line": "Moderate-severe inflammatory: Tab Doxycycline 100 mg OD PO for 6-12 weeks. Severe nodulocystic/scarring: Oral Isotretinoin 0.5-1.0 mg/kg/day under strict dermatologist monitoring and teratogenicity protocol.",
+        "critical_precautions": [
+            "Retinoids are strictly contraindicated during pregnancy due to teratogenicity.",
+            "Advise patient never to squeeze, pick, or manipulate lesions to prevent permanent atrophic scars and hyperpigmentation."
+        ]
+    },
+
+    "eczema": {
+        "condition_key": "eczema",
+        "display_name": "Atopic Dermatitis / Eczema",
+        "icd10": "L20.9",
+        "guideline_basis": "AAD / European Task Force on Atopic Dermatitis (ETFAD)",
+        "diagnostic_summary": "Pruritic, poorly demarcated erythematous patches with epidermal barrier disruption, excoriations, and lichenification in flexural folds.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Fluticasone Propionate / Mometasone Cream",
+                "strength": "0.05% - 0.1%",
+                "route": "Topical",
+                "dosage_schedule": "Apply thin layer twice daily to active inflamed lesions during flares",
+                "duration": "7 - 14 days then taper to intermittent proactive therapy",
+                "purpose": "Mid-potency topical corticosteroid for rapid acute inflammation control",
+                "alternatives": "Hydrocortisone 1% cream for face/flexures"
+            },
+            {
+                "drug_name": "Ceramide & Physiological Lipid Barrier Cream",
+                "strength": "High-lipid emollient",
+                "route": "Topical",
+                "dosage_schedule": "Apply liberally 3-4 times daily and immediately within 3 minutes of bathing",
+                "duration": "Continuous long-term",
+                "purpose": "Primary barrier repair; reduces transepidermal water loss (TEWL) and prevents antigen penetration",
+                "alternatives": "Soft white paraffin + Liquid paraffin (50:50) ointment"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Tacrolimus Ointment",
+                "strength": "0.03% - 0.1%",
+                "route": "Topical",
+                "dosage_schedule": "Apply twice daily for sensitive areas (eyelids, face, neck) as steroid-sparing agent",
+                "duration": "Maintenance phase",
+                "purpose": "Calcineurin inhibitor; controls inflammation without cutaneous atrophy"
+            },
+            {
+                "drug_name": "Bilastine / Levocetirizine Tablet",
+                "strength": "20 mg / 5 mg",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet OD (or at night) during flare-ups",
+                "duration": "1 - 2 weeks",
+                "purpose": "Symptomatic relief of itch-scratch reflex"
+            }
+        ],
+        "refractory_second_line": "Severe recalcitrant atopic dermatitis: Dupilumab 600 mg SC loading dose followed by 300 mg subcutaneous injection every 2 weeks, or oral Cyclosporine 2.5-4 mg/kg/day.",
+        "critical_precautions": [
+            "Avoid potent fluorinated steroids on face, eyelids, and intertriginous skin folds to prevent steroid-induced skin atrophy and telangiectasia.",
+            "Watch for secondary bacterial impetiginization (S. aureus crusting) or viral Eczema Herpeticum (urgent acyclovir required)."
+        ]
+    },
+
+    "psoriasis": {
+        "condition_key": "psoriasis",
+        "display_name": "Psoriasis Vulgaris (Chronic Plaque)",
+        "icd10": "L40.0",
+        "guideline_basis": "AAD-NPF Joint Guidelines / IADVL Guidelines",
+        "diagnostic_summary": "Well-demarcated erythematous plaques covered with coarse, micaceous silvery-white scales over extensor surfaces with Auspitz sign.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Calcipotriol + Betamethasone Dipropionate Ointment",
+                "strength": "0.005% / 0.05%",
+                "route": "Topical",
+                "dosage_schedule": "Apply once daily (OD) to active plaques",
+                "duration": "Up to 4 weeks, then step-down maintenance",
+                "purpose": "Synergistic dual therapy: Vitamin D3 analogue normalizes epidermal proliferation; corticosteroid suppresses immune inflammation",
+                "alternatives": "Clobetasol Propionate 0.05% ointment OD for hyperkeratotic plaques"
+            },
+            {
+                "drug_name": "Salicylic Acid Ointment",
+                "strength": "3% - 6%",
+                "route": "Topical",
+                "dosage_schedule": "Apply once daily in the evening to thick scaling plaques",
+                "duration": "1 - 2 weeks",
+                "purpose": "Keratolytic agent; eliminates thick scale to allow penetration of topical antipsoriatics",
+                "alternatives": "Urea 10% - 20% ointment"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Coal Tar Solution / Shampoo",
+                "strength": "2% - 5%",
+                "route": "Topical",
+                "dosage_schedule": "Apply to scalp or body lesions 2-3 times weekly",
+                "duration": "Ongoing maintenance",
+                "purpose": "Antiproliferative and anti-inflammatory agent slowing rapid keratinocyte turnover"
+            }
+        ],
+        "refractory_second_line": "Moderate-to-severe (>10% BSA or psoriatic arthritis): Tab Methotrexate 10-15 mg PO once weekly with Folic Acid 5 mg; or Biologics (Secukinumab 300 mg SC, Ixekizumab, Adalimumab).",
+        "critical_precautions": [
+            "ABSOLUTE CONTRAINDICATION: NEVER administer oral systemic corticosteroids (e.g. Prednisone, Dexamethasone). Rapid rebound withdrawal can precipitate life-threatening generalized pustular or erythrodermic psoriasis.",
+            "Screen all patients for Psoriatic Arthritis (joint pain, morning stiffness, dactylitis, nail pitting)."
+        ]
+    },
+
+    "urticaria": {
+        "condition_key": "urticaria",
+        "display_name": "Acute / Chronic Spontaneous Urticaria",
+        "icd10": "L50.0, L50.9",
+        "guideline_basis": "EAACI/GA²LEN/EDF/WAO International Urticaria Guidelines",
+        "diagnostic_summary": "Transient, intensely pruritic, erythematous raised edematous wheals with surrounding flare; individual lesions resolve within 24 hours without scarring.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Bilastine Tablet (or Fexofenadine / Levocetirizine)",
+                "strength": "20 mg (or Fexofenadine 180 mg / Levocetirizine 5 mg)",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet once daily in the morning on an empty stomach",
+                "duration": "2 - 4 weeks",
+                "purpose": "Second-generation non-sedating H1 antihistamine; first-line baseline histamine receptor blockade",
+                "alternatives": "Up-dosing titration: Guidelines support escalating up to 4-fold standard dose (e.g. Bilastine 40-80 mg daily) under physician guidance if symptoms persist"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Calamine Lotion with Menthol",
+                "strength": "1% menthol",
+                "route": "Topical",
+                "dosage_schedule": "Apply to erupting wheals PRN",
+                "duration": "As needed",
+                "purpose": "Topical evaporative cooling and soothing relief of cutaneous burning"
+            },
+            {
+                "drug_name": "Famotidine Tablet",
+                "strength": "20 mg",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet twice daily",
+                "duration": "1 - 2 weeks",
+                "purpose": "H2 receptor antagonist; synergistic mast-cell vascular histamine blockade"
+            }
+        ],
+        "refractory_second_line": "Short rescue burst: Oral Prednisolone 20-40 mg OD for 3-5 days strictly for acute disabling exacerbations. Chronic refractory urticaria: Omalizumab (anti-IgE) 300 mg subcutaneous injection every 4 weeks.",
+        "critical_precautions": [
+            "ANAPHYLAXIS SENTINEL: Assess immediately for laryngeal edema, stridor, wheezing, lip/tongue swelling, or presyncope. If present, administer intramuscular Epinephrine 0.3-0.5 mg (1:1000) immediately and call emergency services.",
+            "Advise patient to avoid NSAIDs (Ibuprofen, Diclofenac, Aspirin) and ACE inhibitors, which trigger or aggravate mast-cell degranulation."
+        ]
+    },
+
+    "acanthosis_nigricans": {
+        "condition_key": "acanthosis_nigricans",
+        "display_name": "Acanthosis Nigricans",
+        "icd10": "L83",
+        "guideline_basis": "AAD Clinical Compendium / Endocrine Society Guidelines",
+        "diagnostic_summary": "Symmetrical, hyperpigmented, velvety papillomatous thickening of flexural creases (posterior neck, axillae, groin) driven by hyperinsulinemia/IGF-1 signaling.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Urea + Lactic Acid Cream",
+                "strength": "Urea 10% - 20% + Lactic Acid 5%",
+                "route": "Topical",
+                "dosage_schedule": "Apply once daily at bedtime to affected velvety skin folds",
+                "duration": "8 - 12 weeks",
+                "purpose": "Keratolytic and humectant; dissolves intercorneocyte desmosomes and reduces epidermal papillomatosis",
+                "alternatives": "Glycolic Acid 6% - 12% cream or Salicylic Acid 6% ointment"
+            },
+            {
+                "drug_name": "Tretinoin Cream",
+                "strength": "0.025%",
+                "route": "Topical",
+                "dosage_schedule": "Apply a thin layer on alternate nights to clean, dry skin",
+                "duration": "8 - 12 weeks",
+                "purpose": "Topical retinoid; accelerates epidermal turnover and thins thickened stratum corneum",
+                "alternatives": "Adapalene 0.1% gel"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Endocrine & Metabolic Workup Panel",
+                "strength": "Diagnostic Test",
+                "route": "Laboratory",
+                "dosage_schedule": "Fasting Plasma Glucose, HbA1c, Fasting Serum Insulin, Lipid Profile",
+                "duration": "Baseline",
+                "purpose": "Screens for underlying insulin resistance, Type 2 Diabetes Mellitus, or Polycystic Ovary Syndrome (PCOS)"
+            }
+        ],
+        "refractory_second_line": "Systemic management of underlying insulin resistance: Tab Metformin 500-1000 mg BD PO (under primary physician/endocrinologist guidance). Severe cosmetic cases: Low-dose oral Isotretinoin (10-20 mg/day) or superficial chemical peels.",
+        "critical_precautions": [
+            "Patients must NOT vigorously scrub, rub, or use abrasive sponges on dark skin folds; friction triggers post-inflammatory hyperkeratosis (Koebner effect) and darkens the lesion.",
+            "RED FLAG: Sudden eruptive onset of extensive acanthosis nigricans in non-obese or older patients warrants urgent evaluation for internal malignancy (Malignant Acanthosis Nigricans, most commonly gastric adenocarcinoma)."
+        ]
+    },
+
+    "possible_malignancy": {
+        "condition_key": "possible_malignancy",
+        "display_name": "Suspicious Cutaneous Lesion (Possible Melanoma / NMSC)",
+        "icd10": "D48.5, C44.9",
+        "guideline_basis": "NCCN Clinical Practice Guidelines in Oncology / AAD Guidelines",
+        "diagnostic_summary": "Atypical pigmented or ulcerative cutaneous lesion exhibiting ABCDE clinical features, rapid evolution, or friability requiring histopathological exclusion of malignancy.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "URGENT DERMATOLOGY & DERMATOPATHOLOGY REFERRAL",
+                "strength": "Diagnostic Procedure",
+                "route": "In-Person Clinic",
+                "dosage_schedule": "Immediate dermoscopic evaluation and complete narrow excisional biopsy (1 - 3 mm margins)",
+                "duration": "Expedited (within 1-2 weeks)",
+                "purpose": "Definitive histopathological diagnosis and microstaging (Breslow depth, ulceration status, mitotic rate)",
+                "alternatives": "Punch biopsy or deep saucerization only if excisional biopsy not anatomically feasible"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "High SPF 50+ Broad-Spectrum Mineral Sunscreen",
+                "strength": "SPF 50+ / PA++++",
+                "route": "Topical",
+                "dosage_schedule": "Apply daily to sun-exposed areas",
+                "duration": "Continuous",
+                "purpose": "Shields skin from UVA/UVB radiation and prevents further genomic ultraviolet damage"
+            }
+        ],
+        "refractory_second_line": "Post-biopsy oncological protocol: Wide local excision based on Breslow thickness, Sentinel Lymph Node Biopsy (SLNB), staging CT/PET, and targeted therapy (BRAF/MEK inhibitors) or immunotherapy (PD-1 inhibitors) if indicated.",
+        "critical_precautions": [
+            "ABSOLUTE CONTRAINDICATION: Do NOT perform cryotherapy, electrocautery, curettage, laser ablation, or apply caustic salves before histopathological diagnosis. Destructive modalities destroy diagnostic architecture and worsen prognosis.",
+            "Instruct patient to avoid trauma, picking, or scratching the suspicious lesion."
+        ]
+    },
+
+    "other_unclear": {
+        "condition_key": "other_unclear",
+        "display_name": "Unspecified / Reactive Dermatosis",
+        "icd10": "L98.9",
+        "guideline_basis": "General Dermatological Assessment Protocol",
+        "diagnostic_summary": "Cutaneous presentation with atypical or overlapping morphological features requiring formal in-person examination.",
+        "primary_prescriptions": [
+            {
+                "drug_name": "Physiological Ceramide Barrier Repair Cream",
+                "strength": "Standard",
+                "route": "Topical",
+                "dosage_schedule": "Apply twice daily to clean skin",
+                "duration": "2 - 4 weeks",
+                "purpose": "Soothes irritated cutaneous barrier without masking clinical morphology",
+                "alternatives": "Pure White Petroleum Jelly (USP)"
+            }
+        ],
+        "adjunct_supportive": [
+            {
+                "drug_name": "Calamine Lotion",
+                "strength": "Standard",
+                "route": "Topical",
+                "dosage_schedule": "Apply to pruritic areas as needed",
+                "duration": "As needed",
+                "purpose": "Antipruritic symptomatic comfort"
+            },
+            {
+                "drug_name": "Levocetirizine Tablet",
+                "strength": "5 mg",
+                "route": "Oral (PO)",
+                "dosage_schedule": "1 tablet at bedtime PRN",
+                "duration": "5 - 7 days",
+                "purpose": "Symptomatic control of itching"
+            }
+        ],
+        "refractory_second_line": "In-person consultation for direct examination, dermoscopy, skin scraping for KOH fungal mount, patch test, or diagnostic punch biopsy.",
+        "critical_precautions": [
+            "Avoid empiric prescription of high-potency corticosteroids or antibiotics until definitive morphological classification is established.",
+            "Advise immediate clinical evaluation if systemic symptoms (fever, mucosal involvement, joint pain) arise."
+        ]
+    }
+}
+
+
+def get_clinical_prescription_proposal(condition: Any) -> Dict[str, Any]:
+    """
+    Returns an evidence-based, structured clinical prescription proposal
+    specifically designed for clinician validation, verification, and EMR audit.
+    """
+    cond_str = str(condition.value if hasattr(condition, "value") else condition).lower().replace(" ", "_")
+    if cond_str in STRUCTURED_CLINICIAN_PRESCRIPTIONS:
+        return STRUCTURED_CLINICIAN_PRESCRIPTIONS[cond_str]
+    
+    # Check partial match
+    for k, v in STRUCTURED_CLINICIAN_PRESCRIPTIONS.items():
+        if k in cond_str or cond_str in k:
+            return v
+            
+    return STRUCTURED_CLINICIAN_PRESCRIPTIONS["other_unclear"]
+
+

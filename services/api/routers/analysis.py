@@ -14,6 +14,7 @@ import json
 
 from services.api.database import DatabaseRepo, db_session
 from services.clinical_knowledge.dermatology_kb import DermatologyKnowledgeService
+from services.clinical_knowledge.treatment_protocols import get_clinical_prescription_proposal
 from services.dialogue.state import restore_intake
 from services.dialogue.schemas import (
     SkinCondition,
@@ -288,6 +289,7 @@ def analyze_session(
             "patient_guidance_en": kb_info.get("patient_guidance", {}).get("en", ""),
             "patient_guidance_hi": kb_info.get("patient_guidance", {}).get("hi", "")
         },
+        "proposed_prescription": get_clinical_prescription_proposal(top_cond),
         "triage_verdict": {
             "top_diagnosis": top_diag_val,
             "final_confidence": f"{reasoner_output.final_confidence:.1%}",

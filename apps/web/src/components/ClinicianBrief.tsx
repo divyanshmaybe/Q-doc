@@ -14,6 +14,10 @@ import {
   CheckCircle2,
   Stethoscope,
   BookOpen,
+  Pill,
+  Copy,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { reviewBrief, ClinicianBriefItem } from "../services/api";
 
@@ -31,6 +35,7 @@ export const ClinicianBrief: React.FC<ClinicianBriefProps> = ({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const [copiedRx, setCopiedRx] = useState(false);
 
   if (!briefData) {
     return (
@@ -57,6 +62,36 @@ export const ClinicianBrief: React.FC<ClinicianBriefProps> = ({
   }> = data.ranked_differential || [];
   const redFlags: string[] = data.detected_red_flags || [];
   const doctorReview = briefData.doctor_review || data.doctor_review;
+  const rx = data.proposed_prescription || null;
+
+  const handleCopyRx = (r: any) => {
+    if (!r) return;
+    const lines = [
+      `PROPOSED CLINICAL PRESCRIPTION: ${r.display_name} (${r.icd10 || ""})`,
+      `Guideline Basis: ${r.guideline_basis || "Clinical Protocol"}`,
+      `Indication: ${r.diagnostic_summary || ""}`,
+      "",
+      "PRIMARY MEDICATIONS:",
+      ...(r.primary_prescriptions || []).map(
+        (p: any, i: number) =>
+          `${i + 1}. ${p.drug_name} [${p.strength}] - ${p.route}\n   Dose: ${p.dosage_schedule}\n   Duration: ${p.duration}\n   Purpose: ${p.purpose}`
+      ),
+      "",
+      "ADJUNCTIVE / SUPPORTIVE THERAPY:",
+      ...(r.adjunct_supportive || []).map(
+        (a: any) => `- ${a.drug_name} [${a.strength}]: ${a.dosage_schedule} (${a.duration})`
+      ),
+      "",
+      r.refractory_second_line ? `SECOND-LINE / ESCALATION: ${r.refractory_second_line}` : "",
+      "",
+      "CRITICAL PRECAUTIONS:",
+      ...(r.critical_precautions || []).map((c: string) => `! ${c}`),
+    ].filter(Boolean);
+
+    navigator.clipboard.writeText(lines.join("\n"));
+    setCopiedRx(true);
+    setTimeout(() => setCopiedRx(false), 2000);
+  };
 
   const handleApprove = async () => {
     setSubmitting(true);
@@ -346,6 +381,180 @@ export const ClinicianBrief: React.FC<ClinicianBriefProps> = ({
             </div>
           </div>
         </div>
+
+        {/* TILE 5: PROPOSED PHARMACOTHERAPY & PRESCRIPTION REGIMEN (12 cols) */}
+        {rx && (
+          <div className="md:col-span-12 glass-panel rounded-xl p-5 border border-white/10 flex flex-col gap-4 relative overflow-hidden bg-gradient-to-b from-[#0e1320] to-[#090c15]">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <Pill className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-white">
+                      PROPOSED PHARMACOTHERAPY & PRESCRIPTION REGIMEN
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      CLINICIAN VALIDATION MATRIX
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    TARGET: <strong className="text-white">{rx.display_name}</strong> • ICD-10: <strong className="text-emerald-400">{rx.icd10}</strong> • {rx.guideline_basis}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleCopyRx(rx)}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-mono flex items-center gap-1.5 transition active:scale-95"
+                title="Copy prescription matrix formatted for EMR"
+              >
+                {copiedRx ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-300">Copied to EMR</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Copy Rx for EMR</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Diagnostic Clinical Summary */}
+            {rx.diagnostic_summary && (
+              <div className="p-3 rounded-lg bg-white/[0.03] border border-white/5 text-xs text-slate-300 leading-relaxed font-sans">
+                <span className="font-mono text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  DIAGNOSTIC PHENOTYPE & INDICATION:
+                </span>
+                {rx.diagnostic_summary}
+              </div>
+            )}
+
+            {/* Prescriptions Grid: Primary & Supportive */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* PRIMARY MEDICATIONS */}
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center gap-1.5 text-emerald-300 font-mono text-[11px] font-bold uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>FIRST-LINE PHARMACOTHERAPY ({rx.primary_prescriptions?.length || 0})</span>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  {rx.primary_prescriptions?.map((med: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg bg-[#0c101c] border border-white/10 flex flex-col gap-2 relative overflow-hidden"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-white tracking-wide">
+                          {med.drug_name}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                            {med.strength}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10">
+                            {med.route}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-200 font-mono bg-black/40 p-2 rounded border border-white/5">
+                        <div className="text-electric-light font-medium">
+                          <span className="text-slate-500">DOSAGE: </span>
+                          {med.dosage_schedule}
+                        </div>
+                        <div className="text-slate-400 text-[10px] mt-0.5">
+                          <span className="text-slate-500">DURATION: </span>
+                          {med.duration}
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-300 leading-snug">
+                        <span className="text-[10px] font-mono text-slate-500 uppercase">PURPOSE: </span>
+                        {med.purpose}
+                      </div>
+
+                      {med.alternatives && (
+                        <div className="text-[10px] text-slate-400 font-mono italic pt-1 border-t border-white/5">
+                          <span className="text-slate-500 not-italic">ALT: </span>
+                          {med.alternatives}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ADJUNCTIVE & ESCALATION */}
+              <div className="flex flex-col gap-3">
+                {/* Adjunct Supportive */}
+                {rx.adjunct_supportive && rx.adjunct_supportive.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 text-cyan-300 font-mono text-[11px] font-bold uppercase tracking-wider">
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>ADJUNCTIVE & SYMPTOMATIC SUPPORT</span>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      {rx.adjunct_supportive.map((adj: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-lg bg-white/[0.03] border border-white/5 flex flex-col gap-1 text-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-200">{adj.drug_name}</span>
+                            <span className="text-[10px] font-mono text-cyan-400">{adj.strength}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            {adj.dosage_schedule} • {adj.duration}
+                          </div>
+                          <div className="text-[10px] text-slate-400 italic">
+                            {adj.purpose}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Refractory Second-Line Escalation */}
+                {rx.refractory_second_line && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs flex flex-col gap-1">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                      REFRACTORY / SECOND-LINE ESCALATION PROTOCOL:
+                    </span>
+                    <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
+                      {rx.refractory_second_line}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Critical Precautions & Black Box Sentinel */}
+            {rx.critical_precautions && rx.critical_precautions.length > 0 && (
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-rose-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                  <span>CRITICAL CLINICAL PRECAUTIONS & CONTRAINDICATIONS</span>
+                </div>
+                <ul className="flex flex-col gap-1 text-[11px] text-rose-200/90 leading-relaxed list-disc list-inside">
+                  {rx.critical_precautions.map((prec: string, idx: number) => (
+                    <li key={idx} className="font-sans">
+                      {prec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ATTENDING CLINICIAN TACTILE DECISION ACTIONS (Palantir Action Matrix) */}
