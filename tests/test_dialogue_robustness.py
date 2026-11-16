@@ -27,7 +27,7 @@ class TestClinicalRobustness(unittest.TestCase):
         self.assertTrue(updated_slots.has_itching)
         self.assertFalse(updated_slots.has_fever)
         self.assertFalse(updated_slots.household_contacts_affected)
-        self.assertTrue(is_ready, "All slots filled should immediately signal ready for photo")
+        self.assertFalse(is_ready, "Essential safety and treatment history still need to be collected")
         self.assertIn("legs", msg.lower())
 
     def test_morphology_mirroring_rough_and_flaky(self):
@@ -91,7 +91,7 @@ class TestClinicalRobustness(unittest.TestCase):
         slots, msg3, ready3, _ = self.dm.process_turn(slots, "bukhar nahi hai aur ghar me sab theek hain kisi ko nahi", "has_fever")
         self.assertFalse(slots.has_fever)
         self.assertFalse(slots.household_contacts_affected)
-        self.assertTrue(ready3, "After 3 turns, all 5 slots collected")
+        self.assertFalse(ready3, "Five legacy slots do not complete the safety screen")
 
     def test_language_detection_and_autoswitch(self):
         """Tests accuracy of detect_language across English, Hindi, and Hinglish."""

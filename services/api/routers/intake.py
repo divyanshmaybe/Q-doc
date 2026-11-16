@@ -13,6 +13,7 @@ import base64
 
 from services.api.database import DatabaseRepo
 from services.dialogue.schemas import ClinicalIntakeSlots
+from services.dialogue.state import restore_intake
 from services.dialogue.manager import DialogueManager
 from services.dialogue.language import detect_language
 from services.gateway.stt import SarvamSTTAdapter
@@ -43,12 +44,7 @@ def process_intake_turn(
     req_lang = req.language or session_lang
 
     # Reconstruct current slots from history
-    current_slots = ClinicalIntakeSlots(primary_language=req_lang)
-    for t in turns:
-        if t.get("slots"):
-            for k, v in t["slots"].items():
-                if hasattr(current_slots, k) and v is not None:
-                    setattr(current_slots, k, v)
+    current_slots = restore_intake(turns, req_lang)
 
     # 1. Transcript resolution
     transcript = req.transcript.strip()
@@ -113,7 +109,8 @@ def process_intake_turn(
     updated_slots, agent_msg, is_ready_for_photo, confirm_prompt = dialogue_manager.process_turn(
         current_slots=current_slots,
         user_utterance=transcript,
-        last_question_slot=last_question_slot
+        last_question_slot=last_question_slot,
+        turn_history=turns
     )
 
     # 4. Log agent turn
@@ -127,6 +124,12 @@ def process_intake_turn(
             verdict_data = analyze_session(session_id, image_id=updated_slots.photo_image_id)
         except Exception as e:
             print(f"[IntakeRouter] Auto-analysis synthesis error: {e}")
+
+    if verdict_data:
+        agent_msg = verdict_data["policy_decision"]["spoken_patient_message"]
+        updated_slots.reviewed_plan = agent_msg
+        updated_slots.consultation_stage = "follow_up"
+        DatabaseRepo.log_turn(session_id, turn_idx + 2, "agent", agent_msg, updated_slots.model_dump_json())
 
     # 6. Synthesize TTS response
     speech_res = tts_adapter.synthesize(agent_msg, language_code=lang)

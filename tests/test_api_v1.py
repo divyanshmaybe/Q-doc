@@ -75,6 +75,28 @@ def test_v1_photo_and_analysis_pipeline():
     assert "image_id" in photo_res
     image_id = photo_res["image_id"]
 
+    # Analysis is unavailable until essential questions and confirmation are complete.
+    import pytest
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc:
+        analysis.analyze_session(session_id, image_id=image_id)
+    assert exc.value.status_code == 409
+    answers = {
+        "has_fever": "no", "safety_screen_complete": "none of these",
+        "has_pain": "no", "is_spreading": "no", "prior_treatments": "none",
+        "patient_concern": "I am worried about the cause", "daily_impact": "It disrupts sleep",
+        "nocturnal_itch": "yes, worse at night", "triggers": "none noticed",
+        "household_contacts_affected": "yes", "has_itching": "yes",
+    }
+    state = photo_res["slots"]
+    for _ in range(16):
+        if state.get("summary_confirmed"):
+            break
+        text = "yes" if state.get("consultation_stage") == "summary" else answers[state["last_question_field"]]
+        result = intake.process_intake_turn(session_id, intake.TextTurnRequest(transcript=text, language="en-IN"))
+        state = result["slots"]
+    assert state["summary_confirmed"]
+
     # 4. Run Analyze
     analysis_res = analysis.analyze_session(session_id, image_id=image_id)
     assert analysis_res["session_id"] == session_id

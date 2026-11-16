@@ -75,7 +75,7 @@ export const AgentTranscript: React.FC<AgentTranscriptProps> = ({
             title="What Q-Doc heard from you"
           >
             <span className="text-electric-light font-bold">You said:</span>
-            <span className="truncate italic">"{lastUserSpeech}"</span>
+            <span className="break-words text-left italic">"{lastUserSpeech}"</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -97,6 +97,7 @@ export const AgentTranscript: React.FC<AgentTranscriptProps> = ({
                 onClick={() => onReplay(agentMessage)}
                 className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition flex items-center justify-center opacity-80 hover:opacity-100 z-20 backdrop-blur-sm"
                 title="Replay Voice Audio"
+                aria-label="Replay the assistant response"
               >
                 <Volume2 className="w-3.5 h-3.5" />
               </button>
@@ -105,6 +106,8 @@ export const AgentTranscript: React.FC<AgentTranscriptProps> = ({
             {/* Scrollable text body */}
             <div
               ref={scrollRef}
+              aria-live="polite"
+              aria-atomic="true"
               onScroll={checkScroll}
               className="max-h-[190px] sm:max-h-[250px] overflow-y-auto overscroll-contain pr-4 select-text"
             >

@@ -12,6 +12,17 @@ export interface StartSessionResponse {
   slots: Record<string, any>;
 }
 
+export async function careRequest(sessionId: string, suffix = "", body?: unknown, key?: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/v1/session/${sessionId}/care${suffix}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Please check the required fields.");
+  return data;
+}
+
 export interface TurnResponse {
   session_id: string;
   transcript_received: string;
@@ -64,6 +75,7 @@ export interface AnalyzeResponse {
       clinical_justification: string;
     }>;
     top_diagnosis: string;
+    assessment_source?: string;
     final_confidence: number;
     identified_red_flags: string[];
     synthesized_explanation: string;
@@ -74,6 +86,7 @@ export interface AnalyzeResponse {
     abstain: boolean;
     urgency: "routine" | "seek_opd" | "emergency";
     spoken_patient_message: string;
+    screening_title?: string;
     doctor_brief_id?: string;
     applied_rules: string[];
   };
@@ -139,12 +152,13 @@ const BASE_URL = "";
 
 export async function startSession(
   language: string = "en-IN",
-  mode: "autonomous" | "supervised" = "autonomous"
+  mode: "autonomous" | "supervised" = "autonomous",
+  email?: string
 ): Promise<StartSessionResponse> {
   const res = await fetch(`${BASE_URL}/api/v1/session/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language, mode }),
+    body: JSON.stringify({ language, mode, ...(email ? { email } : {}) }),
   });
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));

@@ -297,14 +297,19 @@ class DermatologyKnowledgeService:
 
     @classmethod
     def get_condition_info(cls, condition: Any) -> Dict[str, Any]:
-        if condition in DERMATOLOGY_KNOWLEDGE_BASE:
-            return DERMATOLOGY_KNOWLEDGE_BASE[condition]
-        cond_str = str(condition.value if hasattr(condition, "value") else condition).lower().replace(" ", "_")
-        for k, v in DERMATOLOGY_KNOWLEDGE_BASE.items():
-            k_str = str(k.value if hasattr(k, "value") else k).lower()
-            if k_str == cond_str or cond_str in k_str or k_str in cond_str:
-                return v
-        return DERMATOLOGY_KNOWLEDGE_BASE[SkinCondition.OTHER_UNCLEAR]
+        from services.clinical_knowledge.coverage import get_coverage
+        coverage = get_coverage(condition)
+        key = coverage["condition_id"]
+        if key in DERMATOLOGY_KNOWLEDGE_BASE:
+            return dict(DERMATOLOGY_KNOWLEDGE_BASE[key], coverage=coverage)
+        return {
+            "condition_id": key, "name_en": coverage["display_name"],
+            "name_hi": coverage["name_hi"],
+            "primary_lesions": coverage["recognition_clues"],
+            "differentiating_questions": coverage["history_clues"],
+            "predilection_sites": coverage["sites"],
+            "patient_guidance": {}, "coverage": coverage,
+        }
 
     @classmethod
     def get_differentials(cls, condition: SkinCondition) -> List[Dict[str, str]]:

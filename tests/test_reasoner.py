@@ -14,7 +14,7 @@ from services.reasoner.engine import ClinicalReasonerEngine
 
 def test_closed_condition_list():
     reasoner = ClinicalReasonerEngine()
-    assert len(reasoner.allowed_conditions) == 8
+    assert set(reasoner.allowed_conditions) == set(SkinCondition)
     assert SkinCondition.ACNE in reasoner.allowed_conditions
     assert SkinCondition.SCABIES in reasoner.allowed_conditions
     assert SkinCondition.POSSIBLE_MALIGNANCY in reasoner.allowed_conditions

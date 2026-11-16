@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
+  ShieldCheck,
   Zap,
   UserCheck,
   ClipboardList,
@@ -22,6 +23,10 @@ import { SlotDrawer } from "./components/SlotDrawer";
 import { CameraCapture } from "./components/CameraCapture";
 import { ClinicianBrief } from "./components/ClinicianBrief";
 import { LandingPage } from "./components/LandingPage";
+import { CareWorkflow } from "./components/CareWorkflow";
+import { CLINICIAN_WORKFLOW_ENABLED } from "./features";
+import { ConsultationProgress } from "./components/ConsultationProgress";
+import { PatientHistory } from "./components/PatientHistory";
 
 import {
   startSession,
@@ -70,10 +75,12 @@ export const App: React.FC = () => {
   const viewRef = useRef(view);
   const activeTurnTokenRef = useRef(0);
   const [mode, setMode] = useState<"autonomous" | "supervised">("autonomous");
+  const [patientEmail, setPatientEmail] = useState("");
 
   // ── Session state ──
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const pendingSessionRef = useRef<ReturnType<typeof startSession> | null>(null);
   const [sessionLang, setSessionLang] = useState<string>("en-IN");
   const sessionLangRef = useRef<string>("en-IN");
 
@@ -103,6 +110,7 @@ export const App: React.FC = () => {
   const [briefs, setBriefs] = useState<ClinicianBriefItem[]>([]);
   const [selectedBrief, setSelectedBrief] = useState<ClinicianBriefItem | null>(null);
 
+  const playbackTokenRef = useRef(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
@@ -177,6 +185,7 @@ export const App: React.FC = () => {
       return;
     }
 
+    const playbackToken = ++playbackTokenRef.current;
     // 1. Stop any previously playing audio or speech
     if (activeAudioRef.current) {
       try {
@@ -195,13 +204,15 @@ export const App: React.FC = () => {
     setAgentPhase("speaking");
 
     // 2. Play Sarvam synthesized audio if present
-    const b64 = audioB64 || latestAudioB64Ref.current;
+    const b64 = audioB64;
     if (b64) {
       try {
         const audioUrl = b64ToBlobUrl(b64);
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
         audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (playbackToken !== playbackTokenRef.current) return;
           setAgentPhase("idle");
           setAutoplayBlocked(false);
         };
@@ -212,6 +223,7 @@ export const App: React.FC = () => {
               setAutoplayBlocked(false);
             })
             .catch((err) => {
+              if (playbackToken !== playbackTokenRef.current) return;
               console.warn("[App] Audio play error / autoplay blocked:", err);
               if (err.name === "NotAllowedError") {
                 setAutoplayBlocked(true);
@@ -242,12 +254,14 @@ export const App: React.FC = () => {
       const sentences = rawSentences.map((s) => s.trim()).filter(Boolean);
       if (sentences.length === 0) return;
 
+      const playbackToken = playbackTokenRef.current;
       let currentIndex = 0;
       const activeLang = sessionLangRef.current || sessionLang;
       const isHi = activeLang.toLowerCase().includes("hi");
       const matchedVoice = getPreferredVoice(isHi);
 
       const speakNextChunk = () => {
+        if (playbackToken !== playbackTokenRef.current) return;
         if (viewRef.current !== "voice") {
           (window as any).__currentUtterance = null;
           return;
@@ -302,15 +316,20 @@ export const App: React.FC = () => {
       }
       if (viewRef.current !== "voice") return;
 
+      // New patient input makes the previous assessment stale.
+      setVerdictData(null);
+
       activeTurnTokenRef.current += 1;
       const turnToken = activeTurnTokenRef.current;
 
       const currentLang = sessionLangRef.current || sessionLang;
-      let activeSessionId = sessionIdRef.current || sessionId;
+      let activeSessionId = sessionIdRef.current;
       if (!activeSessionId) {
         console.warn("[App] Initializing session first...");
         try {
-          const res = await startSession(currentLang, mode);
+          const pending = pendingSessionRef.current || startSession(currentLang, mode, patientEmail);
+          pendingSessionRef.current = pending;
+          const res = await pending;
           if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
           activeSessionId = res.session_id;
           setSessionId(activeSessionId);
@@ -318,6 +337,7 @@ export const App: React.FC = () => {
           if (res.language) setSessionLang(res.language);
         } catch (e: any) {
           if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
+          pendingSessionRef.current = null;
           setErrorMsg("Could not connect to session. Ensure backend server is running.");
           setAgentPhase("error");
           return;
@@ -376,7 +396,7 @@ export const App: React.FC = () => {
         }, 3000);
       }
     },
-    [sessionId, mode, sessionLang]
+    [sessionId, mode, sessionLang, patientEmail]
   );
 
   const voice = useVoiceEngine({ onFinalTranscript: handleFinalTranscript, language: sessionLang });
@@ -392,6 +412,7 @@ export const App: React.FC = () => {
 
   // ── Speech Controller helpers ──
   const stopSpeech = () => {
+    playbackTokenRef.current += 1;
     // Invalidate any in-flight asynchronous reasoning / speech generation
     activeTurnTokenRef.current += 1;
 
@@ -433,7 +454,7 @@ export const App: React.FC = () => {
   const initApp = async () => {
     try {
       const modeData = await getAdminMode();
-      if (modeData?.mode) setMode(modeData.mode);
+      if (modeData?.mode) setMode(CLINICIAN_WORKFLOW_ENABLED ? modeData.mode : "autonomous");
     } catch (_) {}
 
     // Check if this navigation was a page reload (F5 / Refresh)
@@ -452,6 +473,9 @@ export const App: React.FC = () => {
   };
 
   const handleNewSession = async (langOverride?: string, shouldSpeak: boolean = false) => {
+    activeTurnTokenRef.current += 1;
+    sessionIdRef.current = null;
+    setSessionId(null);
     stopSpeech();
     setErrorMsg(null);
     setSlots({});
@@ -473,10 +497,13 @@ export const App: React.FC = () => {
       }
     } catch (_) {}
 
-    setAgentPhase(shouldSpeak ? "connecting" : "idle");
+    setAgentPhase("connecting");
 
+    const pending = startSession(targetLang, mode, patientEmail);
+    pendingSessionRef.current = pending;
     try {
-      const res = await startSession(targetLang, mode);
+      const res = await pending;
+      if (pendingSessionRef.current !== pending) return;
       setSessionId(res.session_id);
       sessionIdRef.current = res.session_id;
       if (res.language) {
@@ -502,6 +529,8 @@ export const App: React.FC = () => {
         setAgentPhase("idle");
       }
     } catch (err: any) {
+      if (pendingSessionRef.current !== pending) return;
+      pendingSessionRef.current = null;
       console.error("[App] Session initialization failed:", err);
       setErrorMsg(err.message || "Failed to start session. Ensure server is online.");
       setAgentPhase("error");
@@ -510,6 +539,9 @@ export const App: React.FC = () => {
 
   // ── Explicit launch handler from visiting page ──
   const handleLaunchDemo = () => {
+    activeTurnTokenRef.current += 1;
+    sessionIdRef.current = null;
+    setSessionId(null);
     viewRef.current = "voice";
     setView("voice");
     if (typeof window !== "undefined") window.location.hash = "#demo";
@@ -543,8 +575,11 @@ export const App: React.FC = () => {
   };
 
   const startSessionInBackground = async (targetLang: string) => {
+    const pending = startSession(targetLang, mode, patientEmail);
+    pendingSessionRef.current = pending;
     try {
-      const res = await startSession(targetLang, mode);
+      const res = await pending;
+      if (pendingSessionRef.current !== pending) return;
       setSessionId(res.session_id);
       sessionIdRef.current = res.session_id;
       if (res.language) {
@@ -560,6 +595,8 @@ export const App: React.FC = () => {
         } catch (_) {}
       }
     } catch (err: any) {
+      if (pendingSessionRef.current !== pending) return;
+      pendingSessionRef.current = null;
       console.warn("[App] Background session start:", err);
     }
   };
@@ -625,7 +662,7 @@ export const App: React.FC = () => {
         setPhotoReady(false);
       } else {
         // Fallback or immediate analysis
-        setAgentMessage("Computing differential diagnosis & Bayesian posteriors...");
+        setAgentMessage("Preparing your assessment and next steps...");
         const analysisRes = await analyzeSession(activeSessionId, photoRes.image_id);
         if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
 
@@ -657,7 +694,7 @@ export const App: React.FC = () => {
 
     setErrorMsg(null);
     setAgentPhase("thinking");
-    setAgentMessage("Computing differential diagnosis & Bayesian posteriors...");
+    setAgentMessage("Preparing your assessment and next steps...");
 
     try {
       const analysisRes = await analyzeSession(activeSessionId, targetImageId);
@@ -716,6 +753,7 @@ export const App: React.FC = () => {
     if (!manualText.trim() || agentPhase === "thinking") return;
     const text = manualText.trim();
     setManualText("");
+    stopSpeech();
     handleFinalTranscript(text);
   };
 
@@ -733,12 +771,12 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen ${view === "clinician" ? "h-auto min-h-screen overflow-y-auto" : "h-screen overflow-hidden"} flex flex-col bg-[#0a0a0a] text-[#eaeaea] relative selection:bg-[#f72585] selection:text-white`}>
+    <div className={`qdoc-workspace min-h-screen ${view === "clinician" ? "h-auto min-h-screen overflow-y-auto" : "h-screen overflow-hidden"} flex flex-col bg-[#0a0a0a] text-[#eaeaea] relative selection:bg-[#f72585] selection:text-white`}>
       {/* Ambient background aura */}
       <div className="orb-ambient-bg" />
 
       {/* ── TOP BAR (ultra-minimal) ── */}
-      <header className="relative z-20 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 border-b border-[#1f1f1f] bg-[#0a0a0a]/90 backdrop-blur-md">
+      <header className="workspace-header relative z-20 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 border-b border-[#1f1f1f] bg-[#0a0a0a]/90 backdrop-blur-md">
         {/* Brand + Return to Landing */}
         <div className="flex items-center gap-3">
           <button
@@ -751,7 +789,7 @@ export const App: React.FC = () => {
           </button>
 
           <div
-            className="flex items-center gap-2.5 cursor-pointer"
+            className="workspace-brand flex items-center gap-2.5 cursor-pointer"
             onClick={handleReturnHome}
           >
             <svg className="w-7 h-7 shrink-0" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -768,7 +806,7 @@ export const App: React.FC = () => {
         {/* Mode toggle + nav */}
         <div className="flex items-center gap-2">
           {/* Autonomy switch */}
-          <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 font-mono text-[10px]">
+          <div className="mode-switch flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 font-mono text-[10px]">
             <button
               onClick={() => handleModeToggle("autonomous")}
               className={`px-2.5 py-1 rounded-full font-bold transition-all ${
@@ -779,16 +817,16 @@ export const App: React.FC = () => {
             >
               <Zap className="w-3 h-3 inline -mt-0.5 mr-0.5" /> AUTO
             </button>
-            <button
+            {CLINICIAN_WORKFLOW_ENABLED && <button
               onClick={() => handleModeToggle("supervised")}
               className={`px-2.5 py-1 rounded-full font-bold transition-all ${
                 mode === "supervised"
-                  ? "bg-amber-500 text-black"
+                  ? "bg-neon text-white shadow-neon-glow"
                   : "text-white/40 hover:text-white/70"
               }`}
             >
               <UserCheck className="w-3 h-3 inline -mt-0.5 mr-0.5" /> SUP
-            </button>
+            </button>}
           </div>
 
           {/* Multilingual auto-switch indicator / toggle */}
@@ -874,8 +912,22 @@ export const App: React.FC = () => {
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="flex flex-col items-center justify-center gap-6 w-full"
+              className="consultation-stage"
             >
+              <div className="consultation-heading">
+                <span className="studio-eyebrow"><span /> YOUR PERSONAL SKIN SCREENING SPACE</span>
+                <h1>Your skin. <em>Let’s understand it.</em></h1>
+                <p>A conversation, a little context, and a clearer next step.</p>
+                <ConsultationProgress stage={slots.consultation_stage} hasPhoto={Boolean(uploadedPhotoId)} hasResult={Boolean(verdictData)} />
+              </div>
+              {/* AGENT TRANSCRIPT (floating below orb) */}
+              <section className="consultation-main">
+              <div className="conversation-panel">
+                <div className="conversation-panel-heading"><span className="studio-eyebrow">LIVE CONVERSATION</span><span className="conversation-tag">Voice + text</span></div>
+                <div className="voice-presence">
+              <div className="orb-stage">
+                <div className="orb-orbit orbit-one" aria-hidden="true" />
+                <div className="orb-orbit orbit-two" aria-hidden="true" />
               {/* THE ORB */}
               <AICoreVisualizer
                 phase={agentPhase}
@@ -883,6 +935,8 @@ export const App: React.FC = () => {
                 onTap={handleOrbTap}
                 disabled={agentPhase === "thinking" || agentPhase === "connecting"}
               />
+
+              </div>
 
               {/* Autoplay unlock prompt (if browser blocked sound) */}
               <AnimatePresence>
@@ -905,14 +959,66 @@ export const App: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              {/* AGENT TRANSCRIPT (floating below orb) */}
-              <AgentTranscript
+                </div>
+                <AgentTranscript
                 agentMessage={agentMessage}
                 interimTranscript={voice.interimTranscript}
                 lastUserSpeech={lastUserSpeech}
                 onReplay={() => agentMessage && playSpeech(agentMessage, latestAudioB64)}
               />
 
+              <div className="conversation-hint"><ShieldCheck className="w-3.5 h-3.5" /><span>AI screening assistance · Clinician review when needed</span></div>
+              </div>
+
+              {/* PHOTO TRIGGER & ATTACHED STATUS */}
+              <div className="photo-actions"><AnimatePresence>
+                {photoReady && !uploadedPhotoId && !verdictData && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                    onClick={() => setView("camera")}
+                    className="glass-panel rounded-full px-5 py-2.5 font-mono text-xs font-bold text-white/90 hover:text-white flex items-center gap-2 transition hover:border-electric/50 active:scale-95 shadow-electric-glow animate-pulse"
+                  >
+                    <Camera className="w-4 h-4 text-electric" />
+                    <span>Take an optional skin photo</span>
+                  </motion.button>
+                )}
+
+                {photoReady && !uploadedPhotoId && !verdictData && (
+                  <button onClick={() => handleFinalTranscript("skip photo")}
+                    disabled={agentPhase === "thinking"}
+                    className="text-sm text-slate-300 underline">
+                    Continue without a photo
+                  </button>
+                )}
+                {uploadedPhotoId && !verdictData && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="glass-panel rounded-full px-4 py-2 font-mono text-[11px] text-emerald-400 flex items-center gap-2 border border-emerald-500/30">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span>Photo received — continue your consultation</span>
+                    </div>
+                    <button
+                      onClick={handleRunFinalAnalysis}
+                      disabled={!slots.summary_confirmed || agentPhase === "thinking"}
+                      title={slots.summary_confirmed ? "Prepare assessment" : "Complete the questions and confirm your history first"}
+                      className="glass-panel rounded-full px-4 py-2 font-mono text-[11px] text-electric-light hover:text-white flex items-center gap-1.5 border border-electric/30 hover:border-electric/70 transition shadow-electric-glow"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Prepare assessment →</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence></div>
+              </section>
+              <aside className="consultation-sidebar" aria-label="Your consultation details">
+                <div className="sidebar-heading"><span className="studio-eyebrow">YOUR CONSULTATION</span><span className="sidebar-live">{verdictData ? "Screening ready" : "In progress"}</span></div>
+                <PatientHistory sessionId={sessionId} email={patientEmail} onEmail={setPatientEmail} />
+                {(slots.body_site || slots.duration_days != null) && <section className="session-facts"><h2>What you’ve shared</h2><SlotDrawer slots={slots} visible={true} /><p>You can correct these details in the conversation.</p></section>}
               {/* VERDICT CARD (appears after analysis) */}
               <AnimatePresence>
                 {verdictData && (
@@ -920,30 +1026,35 @@ export const App: React.FC = () => {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 16 }}
-                    className="glass-panel-glow rounded-2xl p-4 max-w-sm w-full flex flex-col gap-2"
+                    className="screening-result glass-panel-glow rounded-2xl p-4 w-full flex flex-col gap-2"
                   >
                     <div className="flex justify-between items-center">
                       <div>
                         <span className="font-mono text-[9px] font-bold text-electric-light uppercase tracking-wider">
-                          SCREENING RESULT
+                          PROVISIONAL SCREENING
                         </span>
                         <h3 className="text-base font-black text-white capitalize">
-                          {String(verdictData.reasoner_output.top_diagnosis).replace("_", " ")}
+                          {verdictData.policy_decision.screening_title || "Skin screening"}
                         </h3>
                       </div>
                       <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold bg-electric/20 text-electric-light border border-electric/30">
-                        {(verdictData.reasoner_output.final_confidence * 100).toFixed(0)}%
+                        {verdictData.policy_decision.urgency === "emergency"
+                          ? "Urgent action needed"
+                          : verdictData.policy_decision.action === "retake_image"
+                            ? "Photo needed"
+                            : verdictData.policy_decision.abstain
+                              ? "More assessment needed"
+                              : "Provisional result"}
                       </span>
                     </div>
 
-                    {verdictData.reasoner_output.gain_from_voice_history && (
-                      <div className="flex items-center gap-2 text-[11px] text-electric-light bg-electric/10 rounded-lg px-3 py-1.5 border border-electric/20">
-                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                        <span>{verdictData.reasoner_output.gain_from_voice_history}</span>
-                      </div>
-                    )}
+                    <p className="text-xs leading-relaxed text-white/75">
+                      {verdictData.policy_decision.spoken_patient_message}
+                    </p>
+                    {verdictData.reasoner_output.assessment_source === "local_heuristic" &&
+                      <p role="status" className="text-xs text-amber-200">Full image reasoning was unavailable. This result uses the limited local fallback.</p>}
 
-                    {verdictData.doctor_brief_id && (
+                    {CLINICIAN_WORKFLOW_ENABLED && verdictData.doctor_brief_id && (
                       <button
                         onClick={handleOpenClinician}
                         className="text-[10px] font-mono text-white/50 hover:text-electric-light transition text-center pt-1"
@@ -955,41 +1066,14 @@ export const App: React.FC = () => {
                 )}
               </AnimatePresence>
 
-              {/* PHOTO TRIGGER & ATTACHED STATUS */}
-              <AnimatePresence>
-                {photoReady && !uploadedPhotoId && !verdictData && (
-                  <motion.button
-                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                    onClick={() => setView("camera")}
-                    className="glass-panel rounded-full px-5 py-2.5 font-mono text-xs font-bold text-white/90 hover:text-white flex items-center gap-2 transition hover:border-electric/50 active:scale-95 shadow-electric-glow animate-pulse"
-                  >
-                    <Camera className="w-4 h-4 text-electric" />
-                    <span>Take Lesion Photo (Early Intake)</span>
-                  </motion.button>
-                )}
 
-                {uploadedPhotoId && !verdictData && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="glass-panel rounded-full px-4 py-2 font-mono text-[11px] text-emerald-400 flex items-center gap-2 border border-emerald-500/30">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span>Lesion Photo Analyzed & In Context</span>
-                    </div>
-                    <button
-                      onClick={handleRunFinalAnalysis}
-                      className="glass-panel rounded-full px-4 py-2 font-mono text-[11px] text-electric-light hover:text-white flex items-center gap-1.5 border border-electric/30 hover:border-electric/70 transition shadow-electric-glow"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Finalize Clinical Report →</span>
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                {verdictData?.session_id ? <CareWorkflow key={verdictData.session_id} sessionId={verdictData.session_id} /> : <section className="screening-placeholder">
+                  <span className="placeholder-icon"><ClipboardList size={23} /></span>
+                  <h2>Your next steps, in one place.</h2>
+                  <p>After your screening, you’ll find your assessment, supported care guidance, and follow-up here.</p>
+                  <div><span>01</span> Share your symptoms</div><div><span>02</span> Add a clear photo</div><div><span>03</span> Explore your next step</div>
+                </section>}
+              </aside>
             </motion.div>
           )}
 
@@ -1099,9 +1183,9 @@ export const App: React.FC = () => {
 
       {/* ── BOTTOM DRAWER & INTUITIVE INPUT FALLBACK ── */}
       {view === "voice" && (
-        <div className="relative z-20 pb-5 px-4 flex flex-col items-center gap-3 max-w-md mx-auto w-full shrink-0">
+        <div className="consultation-composer relative z-20 pb-5 px-4 flex flex-col items-center gap-3 mx-auto w-full shrink-0">
           {/* Biomarker Pills Drawer */}
-          <SlotDrawer slots={slots} visible={Object.keys(slots).length > 0} />
+
 
           {/* Minimalist Instant Text Input */}
           <form
@@ -1112,21 +1196,22 @@ export const App: React.FC = () => {
               type="text"
               value={manualText}
               onChange={(e) => setManualText(e.target.value)}
-              placeholder="Speak to AI Core or type here..."
+              aria-label="Your message"
+              placeholder="Type an answer or ask a question…"
               className="bg-transparent text-xs text-white placeholder-white/35 focus:outline-none flex-1 font-sans"
-              disabled={agentPhase === "thinking"}
+              disabled={agentPhase === "thinking" || agentPhase === "connecting"}
             />
-            {manualText.trim() && (
               <button
                 type="submit"
-                disabled={agentPhase === "thinking"}
+                disabled={!manualText.trim() || agentPhase === "thinking" || agentPhase === "connecting"}
+                aria-label="Send message"
                 className="p-1 rounded-lg bg-electric text-white shadow-electric-glow transition active:scale-90"
                 title="Send"
               >
                 <CornerDownLeft className="w-3.5 h-3.5" />
               </button>
-            )}
           </form>
+          <p className="composer-note">Voice or text. One question at a time. Your pace.</p>
         </div>
       )}
     </div>

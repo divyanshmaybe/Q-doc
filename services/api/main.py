@@ -21,6 +21,8 @@ except ImportError:
 
 from services.api.database import init_db, DatabaseRepo
 from services.api.routers import session, intake, analysis, brief
+from services.api.routers import care
+from services.api.routers import patients
 from eval.run_benchmarks import run_heldout_evaluation
 
 # Initialize SQLite database
@@ -46,6 +48,8 @@ app.include_router(session.router)
 app.include_router(intake.router)
 app.include_router(analysis.router)
 app.include_router(brief.router)
+app.include_router(care.router)
+app.include_router(patients.router)
 
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "uploads"))
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "apps", "web"))

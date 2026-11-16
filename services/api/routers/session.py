@@ -8,8 +8,8 @@ GET /api/v1/admin/mode
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, Literal
 import uuid
 
 from services.api.database import DatabaseRepo
@@ -35,7 +35,7 @@ def _get_cached_welcome_audio(text: str, language_code: str) -> Dict[str, Any]:
         return _WELCOME_AUDIO_CACHE[lang_key]
 
     # 2. Check disk cache
-    cache_file = os.path.join(_CACHE_DIR, f"welcome_{lang_key.replace('-', '_')}.json")
+    cache_file = os.path.join(_CACHE_DIR, f"welcome_v2_{lang_key.replace('-', '_')}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
@@ -59,21 +59,28 @@ def _get_cached_welcome_audio(text: str, language_code: str) -> Dict[str, Any]:
 
 class StartSessionRequest(BaseModel):
     language: str = "en-IN"
-    mode: Optional[str] = None
-    age: Optional[int] = None
+    mode: Optional[Literal["autonomous", "supervised"]] = None
+    age: Optional[int] = Field(default=None, ge=0, le=120)
     sex: Optional[str] = None
+    email: Optional[str] = None
 
 class ModeToggleRequest(BaseModel):
     mode: str # "autonomous" | "supervised"
 
 @router.post("/api/v1/session/start")
 def start_session(req: StartSessionRequest):
+    from services.api.routers.patients import normalize_email, link_patient
+    try:
+        email = normalize_email(req.email) if req.email else None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     cfg = load_policy_config()
     mode = req.mode or cfg.get("mode", "autonomous")
-    session_id = str(uuid.uuid4())[:8]
+    session_id = str(uuid.uuid4())
 
     # Initialize in DB
     DatabaseRepo.create_session(session_id, language=req.language, mode=mode)
+    patient = link_patient(session_id, email) if email else None
 
     # Initial Welcome with legal informed consent
     is_hi = "hi" in req.language.lower()
@@ -81,13 +88,13 @@ def start_session(req: StartSessionRequest):
         welcome_text = (
             "नमस्ते, मैं क्यू-डॉक हूँ, आपका त्वचा स्क्रीनिंग सहायक। "
             "कृपया ध्यान दें: यह एक स्क्रीनिंग सहायता है, डॉक्टर नहीं। "
-            "बताइए, आपकी त्वचा में क्या परेशानी हो रही है और यह किस अंग पर है?"
+            "बताइए, आपकी त्वचा में क्या परेशानी हो रही है और आपको सबसे ज्यादा किस बात की चिंता है?"
         )
     else:
         welcome_text = (
             "Hello, I am Q-Doc, your skin screening assistant. "
             "Please note: I am a screening aid, not a doctor. "
-            "What skin issue are you experiencing, and where on your body is it located?"
+            "Tell me what has been happening with your skin, and what is worrying you most."
         )
 
     # Log turn 0
@@ -99,6 +106,7 @@ def start_session(req: StartSessionRequest):
 
     return {
         "session_id": session_id,
+        "patient": patient,
         "language": req.language,
         "mode": mode,
         "agent_message": welcome_text,

@@ -30,7 +30,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 text-electric" />
-            <span>EXTRACTED CLINICAL BIOMARKERS</span>
+            <span>Your consultation</span>
           </div>
           <span className="font-mono text-[9px] text-slate-500">
             TURN {slots.turn_count || messages.filter((m) => m.speaker === "patient").length}
@@ -70,7 +70,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 : "bg-white/5 text-slate-500 border-white/5"
             }`}
           >
-            PRURITUS: {slots.has_itching ? "YES" : slots.has_itching === false ? "NO" : "--"}
+            ITCHING: {slots.has_itching ? "YES" : slots.has_itching === false ? "NO" : "--"}
           </span>
 
           {/* Household Contacts (Scabies Indicator) */}
@@ -127,7 +127,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         <Bot className="w-2.5 h-2.5" />
                       </div>
                       <span className="font-bold text-electric-light tracking-wide">
-                        CLINICAL INTAKE AGENT
+                        Q-DOC ASSISTANT
                       </span>
                     </>
                   ) : (
@@ -136,7 +136,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         <User className="w-2.5 h-2.5" />
                       </div>
                       <span className="font-bold text-slate-300 tracking-wide">
-                        PATIENT UTTERANCE
+                        YOU
                       </span>
                     </>
                   )}
@@ -176,7 +176,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
             <div>
               <span className="font-mono text-[10px] font-bold text-electric-light tracking-wider uppercase block">
-                INTAKE COMPLETE: TRANSITION TO OPTICAL SCAN
+                Optional skin photograph
               </span>
               <p className="text-xs text-slate-300 font-medium">{confirmationPrompt}</p>
             </div>
@@ -187,7 +187,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               onClick={onConfirm}
               className="w-full sm:w-auto px-4 py-2 rounded-xl font-mono text-xs font-bold uppercase tracking-wider bg-electric hover:bg-electric-light text-white shadow-electric-glow transition flex items-center justify-center gap-2 shrink-0 active:scale-95"
             >
-              <span>Activate Scanner</span>
+              <span>Take a photo</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}

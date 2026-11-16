@@ -14,6 +14,7 @@ import json
 
 from services.api.database import DatabaseRepo, db_session
 from services.clinical_knowledge.dermatology_kb import DermatologyKnowledgeService
+from services.dialogue.state import restore_intake
 from services.dialogue.schemas import (
     SkinCondition,
     ClinicalIntakeSlots,
@@ -39,6 +40,22 @@ tts_adapter = SarvamTTSAdapter()
 
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@router.get("/api/v1/conditions")
+def list_condition_coverage():
+    """Expose implemented draft scope separately from classifier capability."""
+    from services.clinical_knowledge.coverage import CATALOG, get_coverage
+    from services.ml.classifier import CONDITIONS_ORDER
+    return {
+        "content_status": "draft",
+        "clinical_validation": "not_established",
+        "recognition_backend": "multimodal_model",
+        "condition_count": len(CATALOG) - 2,
+        "special_category_count": 2,
+        "classifier_labels": [c.value for c in CONDITIONS_ORDER],
+        "conditions": [get_coverage(key) for key in CATALOG],
+    }
 
 @router.post("/api/v1/session/{session_id}/photo")
 def upload_photo(
@@ -93,12 +110,7 @@ def upload_photo(
     # Reconstruct slots from session history
     turns = DatabaseRepo.get_session_turns(session_id)
     lang = sess.get("language", "en-IN")
-    intake = ClinicalIntakeSlots(primary_language=lang)
-    for t in turns:
-        if t.get("slots"):
-            for k, v in t["slots"].items():
-                if hasattr(intake, k) and v is not None:
-                    setattr(intake, k, v)
+    intake = restore_intake(turns, lang)
     intake.primary_language = lang
 
     # Inspect early photograph with Gemini Multimodal Vision
@@ -110,13 +122,30 @@ def upload_photo(
 
     # Update intake slots with image ID and visual hypotheses
     intake.photo_image_id = image_id
+    intake.summary_confirmed = False
     intake.condition_specific_history["visual_morphology"] = early_res.get("visual_morphology")
     intake.suspected_differentials = early_res.get("candidate_differentials", [])
     intake.primary_suspected_condition = early_res.get("primary_hypothesis")
     intake.diagnostic_confidence = early_res.get("initial_confidence", 0.65)
     intake.is_ready_for_photo = False
 
-    agent_q = early_res.get("agent_question", "Photo received and examined.")
+    # Consultation planning: ensure intake safety rules & stage transitions are updated
+    from services.dialogue.consultation import ConsultationPlanner
+    from services.gateway.llm import LLMAdapter
+    intake, planner_q, _, _ = ConsultationPlanner(LLMAdapter()).step(
+        intake, {"raw_transcript": "", "event": "photo_uploaded"}, turns, lang
+    )
+    # If vision model dynamically generated an empathetic, image-grounded doctor question
+    # for the suspected condition, use it instead of the static template.
+    if early_res.get("vision_available") and early_res.get("agent_question") and intake.last_question_field and intake.last_question_field.startswith("condition_history:"):
+        agent_q = early_res["agent_question"]
+    else:
+        agent_q = planner_q
+        if not early_res.get("vision_available", False):
+            notice = ("फोटो मिल गई है, लेकिन अभी उसका विश्लेषण उपलब्ध नहीं है। "
+                      if lang.startswith("hi") else
+                      "Your photo was received, but image analysis is temporarily unavailable. ")
+            agent_q = notice + agent_q
     turn_idx = len(turns)
     DatabaseRepo.log_turn(session_id, turn_idx + 1, "agent", agent_q, intake.model_dump_json())
 
@@ -133,7 +162,8 @@ def upload_photo(
         "audio": speech_res,
         "slots": intake.model_dump(),
         "suspected_differentials": early_res.get("candidate_differentials", []),
-        "photo_analyzed": True
+        "photo_analyzed": early_res.get("vision_available", False),
+        "vision_available": early_res.get("vision_available", False),
     }
 
 @router.post("/api/v1/session/{session_id}/analyze")
@@ -171,7 +201,7 @@ def analyze_session(
     elif saved_image_id and isinstance(saved_image_id, str):
         # Load from disk
         with db_session() as conn:
-            row = conn.execute("SELECT file_path FROM images WHERE id = ?", (saved_image_id,)).fetchone()
+            row = conn.execute("SELECT file_path FROM images WHERE id = ? AND session_id = ?", (saved_image_id, session_id)).fetchone()
             if row and os.path.exists(row["file_path"]):
                 with open(row["file_path"], "rb") as f:
                     image_bytes = f.read()
@@ -184,12 +214,10 @@ def analyze_session(
 
     # 2. Gather clinical intake slots
     turns = DatabaseRepo.get_session_turns(session_id)
-    intake = ClinicalIntakeSlots(primary_language=lang)
-    for t in turns:
-        if t.get("slots"):
-            for k, v in t["slots"].items():
-                if hasattr(intake, k) and v is not None:
-                    setattr(intake, k, v)
+    intake = restore_intake(turns, lang)
+
+    if not intake.summary_confirmed and not intake.handoff_required:
+        raise HTTPException(status_code=409, detail="Complete the consultation and confirm the history before analysis")
 
     # 3. Multimodal Diagnostic AI (Direct image examination + voice history + web search grounding)
     reasoner_output = multimodal_agent.diagnose(
@@ -203,7 +231,8 @@ def analyze_session(
     policy_decision = policy_evaluator.evaluate(
         intake=intake,
         img_pred=img_pred,
-        reasoning=reasoner_output
+        reasoning=reasoner_output,
+        mode=sess.get("mode")
     )
 
     top_diag_val = (
@@ -247,6 +276,7 @@ def analyze_session(
         "history_slots": intake.model_dump(),
         "lesion_image_id": saved_image_id,
         "clinical_reference": {
+            "coverage": kb_info.get("coverage", {}),
             "name": kb_info.get("name_en"),
             "name_hi": kb_info.get("name_hi"),
             "icd10": kb_info.get("icd10"),
@@ -277,6 +307,14 @@ def analyze_session(
     }
     brief_id = DatabaseRepo.save_brief(session_id, brief_data)
     policy_decision.doctor_brief_id = brief_id
+
+    # A screening message is not a clinician-reviewed treatment plan.
+    intake.reviewed_plan = None
+    intake.consultation_stage = "screening_complete"
+    if policy_decision.action.value == "refer_only":
+        intake.handoff_required = True
+        intake.handoff_urgency = policy_decision.urgency.value
+    DatabaseRepo.log_turn(session_id, len(turns), "agent", policy_decision.spoken_patient_message, intake.model_dump_json())
 
     # 7. Synthesize audio for patient
     speech_res = tts_adapter.synthesize(

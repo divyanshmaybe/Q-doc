@@ -53,6 +53,30 @@ class ClinicalIntakeSlots(BaseModel):
     is_ready_for_photo: bool = Field(default=False, description="Whether agent has requested early photo capture")
     is_final_verdict_ready: bool = Field(default=False, description="Whether consultation has reached final diagnosis")
 
+    # Consultation memory is persisted with each session snapshot.
+    conversation_history: List[Dict[str, str]] = Field(default_factory=list)
+    fact_history: List[Dict[str, Any]] = Field(default_factory=list)
+    fact_status: Dict[str, str] = Field(default_factory=dict)
+    pending_clarifications: List[str] = Field(default_factory=list)
+    consultation_stage: str = "history"
+    planned_action: str = "ask_question"
+    last_question_field: Optional[str] = None
+    summary_confirmed: bool = False
+    photo_declined: bool = False
+    patient_concern: Optional[str] = None
+    daily_impact: Optional[str] = None
+    nocturnal_itch: Optional[str] = None
+    triggers: Optional[str] = None
+    prior_treatments: Optional[str] = None
+    treatment_barriers: Optional[str] = None
+    safety_screen_complete: Optional[bool] = None
+    breathing_difficulty: Optional[bool] = None
+    mucosal_involvement: Optional[bool] = None
+    is_pregnant: Optional[bool] = None
+    handoff_required: bool = False
+    handoff_urgency: Optional[str] = None
+    reviewed_plan: Optional[str] = None
+
     # State tracking
     missing_required_slots: List[str] = Field(default_factory=list)
     is_complete: bool = False
@@ -71,6 +95,7 @@ class DifferentialDiagnosisItem(BaseModel):
     clinical_justification: str = Field(..., description="Must cite history or visual features")
 
 class ClinicalReasonerOutput(BaseModel):
+    assessment_source: str = "local_heuristic"
     differential: List[DifferentialDiagnosisItem]
     top_diagnosis: Union[SkinCondition, str]
     final_confidence: float
@@ -91,6 +116,7 @@ class PolicyDecision(BaseModel):
     abstain: bool
     urgency: UrgencyLevel
     spoken_patient_message: str
+    screening_title: str = "Skin screening"
     doctor_brief_id: Optional[str] = None
     applied_rules: List[str]
 

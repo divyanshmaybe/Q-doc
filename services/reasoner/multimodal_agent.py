@@ -24,7 +24,7 @@ from services.dialogue.schemas import (
 )
 from services.tools.web_search import MedicalWebSearchTool
 from services.policy.rules import sanitize_safety_constraints
-from services.clinical_knowledge.treatment_protocols import get_treatment_guidance
+from services.clinical_knowledge.coverage import catalog_prompt, normalize_condition, get_coverage
 
 load_dotenv()
 
@@ -55,7 +55,7 @@ class MultimodalDermatologistAgent:
         Forms 3-5 candidate differential hypotheses and formulates the first
         condition-specific discriminating question for the patient.
         """
-        is_hi = "hi" in language.lower() or "hi" in (intake.primary_language or "").lower()
+        is_hi = ("hi" in language.lower()) if language else ("hi" in (intake.primary_language or "").lower())
 
         if self.gemini_key:
             try:
@@ -69,23 +69,31 @@ class MultimodalDermatologistAgent:
                 img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
                 system_instruction = (
-                    "You are a Senior Consultant Multimodal Dermatologist inspecting a patient's skin photograph early in a teledermatology consultation.\n"
+                    "You are a Senior Consultant Multimodal Dermatologist inspecting a patient's skin photograph in a teledermatology consultation.\n"
                     "The patient has shared their opening complaint. Now you are visually inspecting the skin to form 3-5 candidate differential hypotheses "
-                    "and ask the exact targeted, condition-specific questions needed to confirm or differentiate the disease.\n\n"
-                    "TASKS:\n"
-                    "1. Directly inspect the lesion morphology (color, pattern, border, elevation, scale, follicular involvement, flexural distribution).\n"
-                    "2. Formulate 3 to 5 candidate differential diagnoses (e.g. Acanthosis Nigricans, Vitiligo, Melasma, Psoriasis, Scabies, Eczema, Tinea, Rosacea, Lichen Planus, etc.).\n"
-                    "3. Formulate an empathetic, conversational spoken question (2-3 sentences max) acknowledging what you observe in the photo and asking the first condition-specific discriminating question:\n"
-                    "   - If Acne / Folliculitis suspected: acknowledge the comedones/papules seen, and ask whether the spots feel painful or tender, and whether the skin is prone to excess oiliness or recent cosmetic/cleanser changes.\n"
-                    "   - If Acanthosis Nigricans suspected: ask if the darkened skin feels velvety or thickened to the touch, and inquire about recent weight changes or personal/family history of high blood sugar or diabetes.\n"
-                    "   - If Scabies suspected: ask about nocturnal itch surge and household members itching.\n"
-                    "   - If Tinea / Fungal suspected: ask about expanding rings, sweating, pet contact, or gym/towel sharing.\n"
-                    "   - If Psoriasis suspected: ask about silvery scaling, joint aches, or nail changes.\n"
-                    "   - If Eczema / Dermatitis suspected: ask about burning, dryness, or contact with new soaps, detergents, or jewelry.\n"
-                    "4. NEVER prescribe drugs with dosages.\n"
+                    "and formulate a natural, empathetic, doctor-like question specifically tailored to what you see and what the patient has reported.\n\n"
+                    "CLINICAL GUIDELINES & PROMPT REFERENCES (Use as clinical guidance, not fixed templates):\n"
+                    "1. Directly inspect the lesion morphology (color, pattern, border, elevation, scale, follicular involvement, flexural/extensor distribution).\n"
+                    "2. Formulate 3 to 5 candidate differential diagnoses from the provided catalog.\n"
+                    "3. Dynamically craft an empathetic, conversational clinical question (2-3 sentences max) tailored to the individual case:\n"
+                    "   - Acne / Folliculitis: acknowledge visible comedones/papules/pustules, probe tenderness, oiliness, or shaving/cosmetic triggers.\n"
+                    "   - Acanthosis Nigricans: probe velvety/thickened texture, weight changes, or personal/family history of insulin resistance or diabetes.\n"
+                    "   - Scabies / Infestations: probe nocturnal itch exacerbation, burrows, and household/close contacts itching.\n"
+                    "   - Tinea / Fungal infections: probe active annular/ring borders, central clearing, maceration, sweating, pet contact, or shared items.\n"
+                    "   - Psoriasis: probe thick micaceous silvery scaling, extensor distribution, nail pitting, or morning joint stiffness.\n"
+                    "   - Eczema / Dermatitis: probe intense pruritus, personal/family atopy history, xerosis, or contact with detergents, chemicals, or metals.\n"
+                    "   - Urticaria / Hives: probe whether individual wheals are evanescent (disappearing or moving within 24 hours), and check for allergy/food triggers.\n"
+                    "   - Vitiligo / Melasma: probe pigment evolution, sun reactivity, or symmetrical distribution.\n"
+                    "   - Lichen Planus: probe polygonal violaceous papules, Wickham striae, or oral/mucosal soreness.\n"
+                    "   - Bacterial / Cellulitis / Impetigo: probe rapid spreading warmth, honey-colored crusts, tenderness, or systemic malaise.\n"
+                    "   - Other conditions: identify the most discriminating clinical question that a skilled dermatologist would ask to distinguish the diagnosis.\n"
+                    "4. STRICT SAFETY GUARDRAILS:\n"
+                    "   - NEVER prescribe any medications, brand names, or dosages.\n"
+                    "   - NEVER definitively confirm a diagnosis yet; frame questions conversationally to gather more clinical history.\n"
                     f"Target Language: {'Hindi (Devanagari or natural Hindustani)' if is_hi else 'Clear Indian English'}"
                 )
 
+                system_instruction += "\nUse only these draft catalog IDs for hypotheses; clues are not diagnostic criteria:\n" + catalog_prompt()
                 user_prompt = f"""Patient Opening Presentation:
 - Body Site: {intake.body_site or 'Unspecified'}
 - Reported Description: {intake.lesion_type or 'Skin issue'}
@@ -123,49 +131,28 @@ Examine the skin photo and return JSON ONLY with this schema:
                     agent_q = sanitize_safety_constraints(parsed.get("agent_question", ""))
                     return {
                         "visual_morphology": parsed.get("visual_morphology", "Clinical skin examination"),
-                        "primary_hypothesis": parsed.get("primary_hypothesis", "dermatological_condition"),
-                        "candidate_differentials": parsed.get("candidate_differentials", []),
+                        "primary_hypothesis": normalize_condition(parsed.get("primary_hypothesis")),
+                        "candidate_differentials": list(dict.fromkeys(normalize_condition(c) for c in parsed.get("candidate_differentials", []))),
                         "agent_question": agent_q,
-                        "initial_confidence": float(parsed.get("initial_confidence", 0.65))
+                        "initial_confidence": float(parsed.get("initial_confidence", 0.0)),
+                        "vision_available": True
                     }
             except Exception as e:
                 print(f"[MultimodalDermatologistAgent] Early photo inspection API error: {e}")
 
-        # Intelligent clinical fallback based on presenting site & description
-        site = (intake.body_site or "").lower()
-        lesion = (intake.lesion_type or "").lower()
-
-        if any(w in site for w in ["arm", "neck", "underarm", "axilla"]) or "dark" in lesion:
-            diffs = ["Acanthosis Nigricans", "Post-Inflammatory Hyperpigmentation", "Tinea Versicolor", "Erythrasma"]
-            primary = "acanthosis_nigricans"
-            q = (
-                "मैंने आपकी त्वचा की फोटो देख ली है, इसमें गर्दन की सिलवटों में गहरा मखमली रंग दिख रहा है। क्या यह हिस्सा छूने में मखमली या मोटा लगता है, और क्या हाल ही में वजन या शुगर में कोई बदलाव आया है?"
-                if is_hi else
-                "I have examined the photo of your neck. The skin shows darkened pigmentation in the crease. Does the darkened area feel velvety or thickened to the touch, and have you noticed any recent weight changes or a history of high blood sugar or diabetes?"
-            )
-        elif any(w in site for w in ["hand", "wrist", "finger", "web"]) or intake.has_itching:
-            diffs = ["Scabies", "Dyshidrotic Eczema", "Contact Dermatitis", "Urticaria"]
-            primary = "scabies"
-            q = (
-                "मैंने आपके हाथों की फोटो देख ली है। क्या रात के समय खुजली बहुत ज्यादा तेज हो जाती है, और क्या परिवार में किसी अन्य सदस्य को भी ऐसी ही खुजली हो रही है?"
-                if is_hi else
-                "I have examined the photo of your hands. Does the itching intensify significantly at night, and has anyone in your household or close contacts experienced similar itching?"
-            )
-        else:
-            diffs = ["Contact Dermatitis", "Eczema", "Tinea", "Psoriasis"]
-            primary = "dermatological_condition"
-            q = (
-                "मैंने आपकी त्वचा की फोटो देख ली है। क्या इस हिस्से में कोई पपड़ी, दाने या लालिमा है, और क्या किसी खास साबुन या पसीने से यह परेशानी बढ़ती है?"
-                if is_hi else
-                "I have examined the photo. Are there any specific triggers like sweating, harsh soaps, or new products that worsen it, and is there any scaling or flaking?"
-            )
-
+        # No image inference was completed. Continue collecting history without
+        # inventing morphology or anchoring on a site-based disease label.
         return {
-            "visual_morphology": "Lesion inspected with characteristic clinical distribution",
-            "primary_hypothesis": primary,
-            "candidate_differentials": diffs,
-            "agent_question": sanitize_safety_constraints(q),
-            "initial_confidence": 0.65
+            "visual_morphology": None,
+            "primary_hypothesis": "other_unclear",
+            "candidate_differentials": [],
+            "agent_question": (
+                "फोटो मिल गई है, लेकिन अभी उसका विश्लेषण नहीं हो पाया। आपके बताए लक्षणों की जानकारी जारी रखते हैं।"
+                if is_hi else
+                "Your photo was received, but image analysis is temporarily unavailable. We can continue collecting your symptoms."
+            ),
+            "initial_confidence": 0.0,
+            "vision_available": False,
         }
 
     def diagnose(
@@ -178,6 +165,8 @@ Examine the skin photo and return JSON ONLY with this schema:
         """
         Performs direct multimodal image examination + intake analysis + web grounding.
         """
+        is_hi = ("hi" in language.lower()) if language else ("hi" in (intake.primary_language or "").lower())
+
         # If API key is available, run multimodal visual diagnosis
         if self.gemini_key:
             try:
@@ -188,20 +177,26 @@ Examine the skin photo and return JSON ONLY with this schema:
                     language=language
                 )
             except Exception as e:
-                # Log error and fall back gracefully
-                print(f"[MultimodalDermatologistAgent] Multimodal API error: {e}. Falling back to Bayesian engine.")
+                print(f"[MultimodalDermatologistAgent] Multimodal API error: {e}. Model unavailable.")
 
-        # Fallback to local Bayesian reasoner engine
-        from services.reasoner.engine import ClinicalReasonerEngine
-        local_engine = ClinicalReasonerEngine()
-        fallback_pred = classifier_pred or ImagePrediction(
-            probabilities={c: 0.125 for c in SkinCondition},
-            top_condition=SkinCondition.OTHER_UNCLEAR,
-            confidence=0.125,
-            image_quality_score=0.9,
-            quality_passed=True
+        # Model is unavailable (no API key or network error)
+        # Avoid fallback heuristics to prevent unreliable or inaccurate clinical output
+        unavailable_msg = (
+            "एआई डायग्नोस्टिक मॉडल वर्तमान में उपलब्ध नहीं है। कृपया त्वचा की प्रत्यक्ष जांच हेतु किसी योग्य डॉक्टर से संपर्क करें।"
+            if is_hi else
+            "The AI diagnostic model is currently unavailable. Please consult a qualified clinician or dermatologist for an in-person physical examination."
         )
-        return local_engine.reason(intake=intake, img_pred=fallback_pred)
+        return ClinicalReasonerOutput(
+            assessment_source="unavailable",
+            differential=[],
+            top_diagnosis="other_unclear",
+            final_confidence=0.0,
+            identified_red_flags=[],
+            synthesized_explanation=unavailable_msg,
+            baseline_image_top=classifier_pred.top_condition if classifier_pred else "other_unclear",
+            baseline_image_confidence=classifier_pred.confidence if classifier_pred else 0.0,
+            gain_from_voice_history="Model currently unavailable"
+        )
 
     def _run_multimodal_vision_inference(
         self,
@@ -222,18 +217,18 @@ Examine the skin photo and return JSON ONLY with this schema:
         pil_img.save(buf, format="JPEG", quality=90)
         img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-        is_hi = "hi" in language.lower() or "hi" in (intake.primary_language or "").lower()
+        is_hi = ("hi" in language.lower()) if language else ("hi" in (intake.primary_language or "").lower())
 
         # Format clinical intake summary for prompt
         intake_summary = (
             f"- Body Site: {intake.body_site or 'Unspecified'}\n"
             f"- Reported Description: {intake.lesion_type or 'Rash/lesion'}\n"
             f"- Duration: {intake.duration_days} days\n"
-            f"- Itching: {'Yes (pruritic)' if intake.has_itching else 'No'}\n"
+            f"- Itching: {'Unknown' if intake.has_itching is None else ('Yes (pruritic)' if intake.has_itching else 'No')}\n"
             f"- Household Contacts Affected: {'Yes (contagious cluster)' if intake.household_contacts_affected else 'No / Unreported'}\n"
-            f"- Fever: {'Yes (systemic signs)' if intake.has_fever else 'No'}\n"
-            f"- Pain: {'Yes' if intake.has_pain else 'No'}\n"
-            f"- Spreading: {'Yes' if intake.is_spreading else 'Stable'}"
+            f"- Fever: {'Unknown' if intake.has_fever is None else ('Yes (systemic signs)' if intake.has_fever else 'No')}\n"
+            f"- Pain: {'Unknown' if intake.has_pain is None else ('Yes' if intake.has_pain else 'No')}\n"
+            f"- Spreading: {'Unknown' if intake.is_spreading is None else ('Yes' if intake.is_spreading else 'No')}"
         )
 
         classifier_context = ""
@@ -260,34 +255,30 @@ Examine the skin photo and return JSON ONLY with this schema:
             "margins, erythema, scaling, follicular plugging, burrows, or atypical pigmentation).\n"
             "Synthesize what you observe in the image with the patient's reported symptoms and the web search guidelines.\n\n"
             "CRITICAL DIAGNOSTIC GUIDELINES:\n"
-            "1. Common conditions (Scabies, Eczema, Tinea, Acne, Urticaria, Psoriasis) should receive direct, "
-            "actionable provisional diagnoses and first-line OTC/hygiene treatment protocols.\n"
-            "2. Never recommend doctor referral for standard, non-urgent cases unless true red flags are present.\n"
+            "1. Return provisional hypotheses only, using the supplied catalog IDs. Use other_unclear when evidence is insufficient.\n"
+            "2. Identify when examination or clinician treatment is needed. Do not invent medication or treatment instructions.\n"
             "3. Red flags: suspected malignancy (asymmetry, irregular border, multiple colors), infant < 1 year, "
             "fever with rapidly spreading rash, or anaphylaxis/angioedema signs.\n"
             "4. If visual features in the photo are non-specific, subtle, or indeterminate, synthesize and weigh the patient's reported clinical history (e.g. nocturnal itching with household members affected on hands/wrists is classic Scabies transmission triad).\n"
             "5. Output valid JSON ONLY matching the required schema."
         )
 
+        system_instruction += "\nDraft recognition catalog (not validated diagnostic criteria):\n" + catalog_prompt()
         user_prompt = f"""Patient Clinical History:
 {intake_summary}
+Additional patient-reported condition history (unverified):
+{json.dumps(intake.condition_specific_history, ensure_ascii=False)}
 {classifier_context}
 {search_snippets}
 
 Examine the attached skin photograph and return JSON ONLY with this schema:
 {{
   "visual_findings": "Detailed description of morphological features observed in the image (borders, color, elevation, scaling)",
-  "primary_diagnosis": "clinical condition name (e.g. acanthosis_nigricans, vitiligo, melasma, scabies, eczema, acne, psoriasis, urticaria, tinea, lichen_planus, seborrheic_dermatitis, rosacea, possible_malignancy, or other_unclear)",
+  "primary_diagnosis": "one exact condition_id from the supplied catalog, or other_unclear",
   "confidence": 0.0 to 1.0,
   "differential": [
     {{"condition": "Condition name", "probability": 0.0 to 1.0, "clinical_rationale": "Direct visual and symptom correlation"}}
   ],
-  "spoken_patient_explanation": "Empathetic, clear diagnostic explanation without medical jargon in {'Hindi' if is_hi else 'English'}",
-  "first_line_management": {{
-    "otc_active_ingredients": ["Active ingredient / barrier lotion"],
-    "daily_hygiene_care": ["Hygiene, washing, temperature instructions"],
-    "escalation_criteria": ["When to consult doctor if not resolved"]
-  }},
   "identified_red_flags": []
 }}"""
 
@@ -313,86 +304,36 @@ Examine the attached skin photograph and return JSON ONLY with this schema:
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         parsed = json.loads(raw_text)
 
-        # Map string diagnosis to SkinCondition enum or open condition string
-        raw_diag = str(parsed.get("primary_diagnosis", "other_unclear")).lower().replace(" ", "_").strip()
-        top_cond = SkinCondition.OTHER_UNCLEAR
-        for c in SkinCondition:
-            if c.value in raw_diag or raw_diag in c.value:
-                top_cond = c
-                break
+        # Canonical IDs prevent free-text diagnoses bypassing catalog boundaries.
+        top_cond = normalize_condition(parsed.get("primary_diagnosis", "other_unclear"))
+        diff_items = [DifferentialDiagnosisItem(
+            condition=normalize_condition(d.get("condition", "other_unclear")),
+            probability=max(0.0, min(1.0, float(d.get("probability", 0.0)))),
+            clinical_justification=d.get("clinical_rationale", "")
+        ) for d in parsed.get("differential", [])]
+        diff_items.sort(key=lambda item: item.probability, reverse=True)
 
-        # If not matching an exact enum but clearly identified a real condition
-        if top_cond == SkinCondition.OTHER_UNCLEAR and raw_diag not in ["other_unclear", "unclear", "unknown"]:
-            top_cond = raw_diag
-
-        # Check for specific clinical recognitions like Acanthosis Nigricans
-        if top_cond == SkinCondition.OTHER_UNCLEAR:
-            if "acanthosis" in str(raw_diag) or any("acanthosis" in str(d.get("clinical_rationale", "")).lower() or "acanthosis" in str(d.get("condition", "")).lower() for d in parsed.get("differential", [])):
-                top_cond = SkinCondition.ACANTHOSIS_NIGRICANS
-
-        # Clinical safeguard: If vision returned unclear but patient history contains pathognomonic triad
-        if top_cond in [SkinCondition.OTHER_UNCLEAR, "other_unclear"]:
-            if intake.has_itching and intake.household_contacts_affected and (
-                not intake.body_site or any(s in str(intake.body_site).lower() for s in ["hand", "wrist", "web", "finger", "arm"])
-            ):
-                top_cond = SkinCondition.SCABIES
-
-        # Convert differential
-        diff_items: List[DifferentialDiagnosisItem] = []
-        for d in parsed.get("differential", []):
-            d_name = str(d.get("condition", "unclear")).lower().replace(" ", "_")
-            # Map condition
-            d_cond = SkinCondition.OTHER_UNCLEAR
-            if "acanthosis" in d_name:
-                d_cond = SkinCondition.ACANTHOSIS_NIGRICANS
-            else:
-                for c in SkinCondition:
-                    if c.value in d_name:
-                        d_cond = c
-                        break
-                if d_cond == SkinCondition.OTHER_UNCLEAR and d_name not in ["other_unclear", "unclear"]:
-                    d_cond = d_name
-
-            diff_items.append(DifferentialDiagnosisItem(
-                condition=d_cond,
-                probability=float(d.get("probability", 0.1)),
-                clinical_justification=d.get("clinical_rationale", "")
-            ))
-
-        # Build full synthesized message with treatment regimen
-        spoken_msg = parsed.get("spoken_patient_explanation", "")
-        management = parsed.get("first_line_management", {})
-        otc = management.get("otc_active_ingredients", [])
-        care = management.get("daily_hygiene_care", [])
-        esc = management.get("escalation_criteria", [])
-
-        # Format treatment guidance cleanly
-        if top_cond != SkinCondition.POSSIBLE_MALIGNANCY:
-            if otc or care or esc:
-                treatment_text = (
-                    f"\n\n{'उपचार व देखभाल के सुझाव' if is_hi else 'First-line care & hygiene regimen'}:\n"
-                    f"1. {'प्राथमिक उत्पाद' if is_hi else 'Recommended active care'}: {', '.join(otc)}\n"
-                    f"2. {'दैनिक देखभाल' if is_hi else 'Daily skin care'}: {', '.join(care)}\n"
-                    f"3. {'डॉक्टर से कब मिलें' if is_hi else 'Clinical escalation'}: {', '.join(esc)}"
-                )
-                spoken_msg = f"{spoken_msg} {treatment_text}".strip()
-            else:
-                spoken_msg = f"{spoken_msg} {get_treatment_guidance(top_cond, lang='hi' if is_hi else 'en')}".strip()
-
-        # Enforce safety guardrail (no dosages or prescriptive drug terms)
-        sanitized_explanation = sanitize_safety_constraints(spoken_msg)
+        # Treatment comes from the catalog, not model-generated prescribing prose.
+        # This is a clinician-facing draft; the policy service controls patient output.
+        coverage = get_coverage(top_cond)
+        sanitized_explanation = sanitize_safety_constraints(
+            f"Provisional possibility: {coverage['display_name']}. "
+            f"Basic care: {' '.join(coverage['basic_care']) or 'No condition-specific self-care pathway.'} "
+            f"Clinician treatment overview: {coverage['treatment_summary']}"
+        )
 
         baseline_top = classifier_pred.top_condition if classifier_pred else top_cond
-        baseline_conf = classifier_pred.confidence if classifier_pred else float(parsed.get("confidence", 0.85))
-        final_conf = float(parsed.get("confidence", 0.85))
+        baseline_conf = classifier_pred.confidence if classifier_pred else max(0.0, min(1.0, float(parsed.get("confidence", 0.0))))
+        final_conf = max(0.0, min(1.0, float(parsed.get("confidence", 0.0))))
 
         gain_summary = (
             f"Multimodal Visual Vision inspected image directly with +{round((final_conf - baseline_conf)*100, 1)}% confidence gain"
             if final_conf > baseline_conf else
-            f"Multimodal Visual Vision confirmed {top_cond.value} from photographic morphology"
+            f"Multimodal Visual Vision confirmed {top_cond} as a provisional photographic hypothesis"
         )
 
         return ClinicalReasonerOutput(
+            assessment_source="multimodal",
             differential=diff_items,
             top_diagnosis=top_cond,
             final_confidence=round(final_conf, 3),

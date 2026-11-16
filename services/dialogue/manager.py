@@ -95,7 +95,8 @@ class DialogueManager:
         self,
         current_slots: ClinicalIntakeSlots,
         user_utterance: str,
-        last_question_slot: Optional[str] = None
+        last_question_slot: Optional[str] = None,
+        turn_history: Optional[List[Dict[str, Any]]] = None
     ) -> Tuple[ClinicalIntakeSlots, str, bool, Optional[str]]:
         """
         Two-Tier Processing:
@@ -105,33 +106,94 @@ class DialogueManager:
         """
         lang = "hi" if "hi" in current_slots.primary_language.lower() else "en"
 
-        # Tier 1: Clean & resolve user intent
-        norm_res = self.normalizer.normalize(
-            raw_transcript=user_utterance,
-            last_agent_question=last_question_slot,
-            language=lang
-        )
+        history = turn_history if turn_history is not None else current_slots.conversation_history
+        context = next((t.get("transcript", t.get("text", "")) for t in reversed(history)
+                        if t.get("speaker", t.get("role")) in ("agent", "assistant")), None)
+        question_field = current_slots.last_question_field or last_question_slot
+        # Repair the observed legacy inference: "it itches" was stored as no pain.
+        # Restore the previous value from provenance, rather than assuming an answer.
+        if current_slots.has_pain is False:
+            pain_fact = next((fact for fact in reversed(current_slots.fact_history)
+                              if fact.get("field") == "has_pain"), None)
+            if pain_fact and pain_fact.get("value") is False and pain_fact.get("transcript", "").strip().lower() in ("it itches", "it is itchy", "it's itchy"):
+                current_slots.has_pain = pain_fact.get("previous")
+                current_slots.fact_status["has_pain"] = "asked_unknown"
 
-        # Fallback slot extraction to guarantee robust memory capture
-        self._extract_slots(user_utterance, current_slots, lang, last_question_slot)
-
-        # Tier 2: Head Dermatologist Agent step
-        slots, agent_msg, is_ready, confirm_prompt = self.head_agent.step(
-            slots=current_slots,
-            normalized_intent=norm_res,
-            turn_history=[],
-            lang=lang
-        )
-
-        # Compute remaining missing slots for UI state synchronization
-        if is_ready:
-            slots.missing_required_slots = []
+        answer = user_utterance.casefold().strip(" .!,?।")
+        affirmative = answer in ("yes", "yeah", "yep", "haan", "हाँ", "हां")
+        negative = answer in ("no", "nope", "nahi", "nahin", "नहीं", "none", "none of these", "no to all")
+        direct_fields = ("has_fever", "has_itching", "has_pain", "is_spreading",
+                         "household_contacts_affected", "safety_screen_complete")
+        if question_field in direct_fields and (affirmative or negative):
+            norm_res = {"ambiguous_fields": []}
+            if question_field == "safety_screen_complete":
+                if negative:
+                    norm_res["safety_screen_complete"] = True
+                # A positive composite answer needs clarification, not an invented symptom.
+            else:
+                norm_res[question_field] = affirmative
         else:
-            missing = self.compute_missing_slots(slots)
-            prioritized_missing = self.prioritize_missing_slots(slots, missing)
-            slots.missing_required_slots = prioritized_missing
-        slots.is_complete = is_ready
-
+            norm_res = self.normalizer.normalize(user_utterance, context or question_field, lang)
+        # A field is uncertain only when the patient is discussing that field.
+        # Pronouns in an answer ("it itches") do not invalidate a known body site.
+        cue_patterns = {
+            "body_site": r"\b(where|location|site|thighs?|legs?|arms?|hands?|face|groin|pubic|neck|back|chest|feet|foot|scalp)\b|हाथ|पैर|चेहर|जांघ",
+            "duration_days": r"\b(days?|weeks?|months?|years?|since|duration|ago)\b|दिन|हफ्त|महीन|साल",
+            "age": r"\b(age|old)\b|उम्र|आयु",
+            "has_itching": r"\b(itch\w*|scratch\w*)\b|खुजली|khujli",
+            "has_pain": r"\b(pain\w*|hurt\w*|sore|tender)\b|दर्द|dard",
+            "has_fever": r"\b(fever|chills|temperature)\b|बुखार|bukhar",
+            "is_spreading": r"\b(spread\w*|grow\w*|bigger|expanding|changing)\b|फैल|phail",
+            "household_contacts_affected": r"\b(family|household|brother|sister|partner|roommate|anyone|others)\b|घर|परिवार",
+        }
+        discussed = {field for field, pattern in cue_patterns.items()
+                     if re.search(pattern, user_utterance, re.IGNORECASE)}
+        ambiguous = norm_res.get("ambiguous_fields", [])
+        norm_res["ambiguous_fields"] = [field for field in ambiguous
+            if field == question_field or field in discussed] if isinstance(ambiguous, list) else []
+        # Do not accept model-inferred negatives for symptoms the patient did not mention.
+        for field in ("has_pain", "has_itching", "has_fever", "is_spreading", "household_contacts_affected"):
+            if field not in discussed and not (field == question_field and (affirmative or negative)):
+                norm_res.pop(field, None)
+        # A new explicit symptom can resolve a prior spurious clarification about
+        # an already recorded, unrelated fact without discarding the fact itself.
+        current_slots.pending_clarifications = [field for field in current_slots.pending_clarifications
+            if getattr(current_slots, field, None) is None or field in discussed]
+        norm_res["raw_transcript"] = user_utterance
+        norm_res["clean_meaning"] = user_utterance
+        # Parse this utterance independently so patient corrections can replace prior facts.
+        fresh = ClinicalIntakeSlots(primary_language=current_slots.primary_language)
+        self._extract_slots(user_utterance, fresh, lang, question_field)
+        for field in ("body_site", "lesion_type", "duration_days", "age", "has_itching",
+                      "has_fever", "household_contacts_affected", "has_pain", "is_spreading"):
+            value = getattr(fresh, field)
+            if value is not None:
+                norm_res[field] = value
+                # Explicit local extraction resolves model uncertainty for this fact.
+                ambiguous = norm_res.get("ambiguous_fields", [])
+                if isinstance(ambiguous, list):
+                    norm_res["ambiguous_fields"] = [item for item in ambiguous if item != field]
+        if question_field in ("prior_treatments", "patient_concern", "daily_impact", "treatment_barriers", "nocturnal_itch", "triggers"):
+            norm_res[question_field] = user_utterance
+        # Explicit safety phrases are handled even when the language service is unavailable.
+        lower = user_utterance.lower()
+        for field, positives, negatives in (
+            ("breathing_difficulty", ["cannot breathe", "can't breathe", "trouble breathing", "सांस लेने में तकलीफ"], ["no trouble breathing", "no breathing difficulty"]),
+            ("mucosal_involvement", ["mouth sores", "eye sores", "skin peeling", "मुंह में घाव"], ["no mouth sores", "no eye sores", "no skin peeling"]),
+            ("is_pregnant", ["i am pregnant", "i'm pregnant", "मैं गर्भवती"], ["not pregnant"]),
+        ):
+            clauses = re.split(r"[,;.!?]|\bbut\b|\band\b|\bhowever\b|लेकिन|परंतु|और", lower)
+            if any(any(term in clause for term in positives) and not any(term in clause for term in negatives)
+                   for clause in clauses):
+                norm_res[field] = True
+        slots, agent_msg, is_ready, confirm_prompt = self.head_agent.step(
+            slots=current_slots, normalized_intent=norm_res, turn_history=history, lang=lang
+        )
+        slots.conversation_history = [
+            {"speaker": t.get("speaker", t.get("role", "patient")),
+             "transcript": t.get("transcript", t.get("text", ""))} for t in history
+        ] + [{"speaker": "patient", "transcript": user_utterance},
+             {"speaker": "agent", "transcript": agent_msg}]
         return slots, agent_msg, is_ready, confirm_prompt
 
     def _generate_adaptive_question(
@@ -225,70 +287,18 @@ class DialogueManager:
         return sanitize_safety_constraints(full_msg)
 
     def _extract_slots(self, utterance: str, slots: ClinicalIntakeSlots, lang: str, last_question_slot: Optional[str] = None) -> None:
-        # 1. Primary: Semantic LLM extraction (natural clinical comprehension without brittle pattern matching)
-        if self.llm_adapter:
-            try:
-                system_prompt = (
-                    "You are a clinical dermatology intake assistant. Extract clinical history slots from the patient's utterance into structured JSON.\n"
-                    "Allowed body_site categories: ['arms', 'legs', 'face', 'hands', 'groin', 'torso', 'whole_body']. Map specific areas naturally (e.g. underarms -> arms, feet/toes -> legs, belly -> torso).\n"
-                    "Slots to return:\n"
-                    "- body_site: string or null\n"
-                    "- lesion_type: string (morphological description in patient's own words, e.g. 'rough and flaky skin', 'dark skin', 'pimples') or null\n"
-                    "- duration_days: integer (approximate days, e.g. 1 year = 365, 2 weeks = 14) or null\n"
-                    "- has_itching: boolean or null\n"
-                    "- has_fever: boolean or null\n"
-                    "- household_contacts_affected: boolean or null\n"
-                    "- is_spreading: boolean or null\n"
-                    "- has_pain: boolean or null\n"
-                    f"Context: The last question asked to the patient was about slot '{last_question_slot}'."
-                )
-                user_prompt = f"Patient Utterance: \"{utterance}\""
-                llm_res = self.llm_adapter.generate_json(system_prompt, user_prompt)
-                if isinstance(llm_res, dict) and llm_res.get("status") != "fallback":
-                    if not slots.body_site and llm_res.get("body_site"):
-                        slots.body_site = str(llm_res["body_site"]).lower()
-                    if not getattr(slots, "lesion_type", None) and llm_res.get("lesion_type"):
-                        slots.lesion_type = str(llm_res["lesion_type"]).lower()
-                    if slots.duration_days is None and llm_res.get("duration_days") is not None:
-                        try:
-                            slots.duration_days = int(llm_res["duration_days"])
-                        except (ValueError, TypeError):
-                            pass
-                    if slots.has_itching is None and llm_res.get("has_itching") is not None:
-                        slots.has_itching = bool(llm_res["has_itching"])
-                    if slots.has_fever is None and llm_res.get("has_fever") is not None:
-                        slots.has_fever = bool(llm_res["has_fever"])
-                    if slots.household_contacts_affected is None and llm_res.get("household_contacts_affected") is not None:
-                        slots.household_contacts_affected = bool(llm_res["household_contacts_affected"])
-                    if slots.is_spreading is None and llm_res.get("is_spreading") is not None:
-                        slots.is_spreading = bool(llm_res["is_spreading"])
-                    if slots.has_pain is None and llm_res.get("has_pain") is not None:
-                        slots.has_pain = bool(llm_res["has_pain"])
-            except Exception:
-                pass
-
         lower = utterance.lower()
 
         is_affirmative = bool(re.search(r'\b(yes|yeah|yep|yup|haan|हाँ|ha|sure|true|correct|affected)\b', lower))
         is_negative = bool(re.search(r'\b(no|nope|nah|nahi|नहीं|nahin|not|nobody|none|never)\b', lower))
 
-        # Contextual resolution if user directly answers the previous question
-        if last_question_slot:
-            if last_question_slot == "has_fever" and slots.has_fever is None:
-                if is_affirmative and not is_negative:
-                    slots.has_fever = True
-                elif is_negative and not is_affirmative:
-                    slots.has_fever = False
-            elif last_question_slot == "household_contacts_affected" and slots.household_contacts_affected is None:
-                if is_affirmative and not is_negative:
-                    slots.household_contacts_affected = True
-                elif is_negative and not is_affirmative:
-                    slots.household_contacts_affected = False
-            elif last_question_slot == "has_itching" and slots.has_itching is None:
-                if is_affirmative and not is_negative:
-                    slots.has_itching = True
-                elif is_negative and not is_affirmative:
-                    slots.has_itching = False
+        # Resolve short direct answers only; a negation elsewhere is not an answer.
+        answer = lower.strip(" .!।")
+        if last_question_slot in ("has_fever", "has_itching", "has_pain", "is_spreading", "household_contacts_affected"):
+            if answer in ("yes", "yeah", "yep", "haan", "हाँ", "हां"):
+                setattr(slots, last_question_slot, True)
+            elif answer in ("no", "nope", "nahi", "nahin", "नहीं"):
+                setattr(slots, last_question_slot, False)
 
         # A. Comprehensive Body Site Extraction
         sites_map = {
@@ -357,7 +367,7 @@ class DialogueManager:
                     break
             if not slots.body_site:
                 if any(w in lower for w in [
-                    "body", "skin", "everywhere", "all over", "whole body", "full body", "spreading", "spread",
+                    "everywhere", "all over", "whole body", "full body",
                     "शरीर", "त्वचा", "हर जगह", "पूरे शरीर"
                 ]):
                     slots.body_site = "whole_body"
@@ -385,33 +395,14 @@ class DialogueManager:
                 slots.duration_days = 7
             elif any(w in lower for w in ["today", "आज", "yesterday", "कल", "since yesterday", "last night"]):
                 slots.duration_days = 1
-            elif any(w in lower for w in ["few days", "कुछ दिन", "couple of days", "kuch din"]):
-                slots.duration_days = 3
-            elif any(w in lower for w in ["since childhood", "all my life", "born with it", "bachpan se", "bachpan", "पैदाइशी", "बचपन से"]):
-                slots.duration_days = 3650
-            elif any(w in lower for w in ["on and off", "comes and goes", "recurrent", "recurring", "aata jaata", "aata hai jaata hai", "बार-बार"]):
-                slots.duration_days = 90
-            elif any(w in lower for w in ["seasonal", "worse in winter", "worse in summer", "sardi me", "garmi me", "मौसमी"]):
-                slots.duration_days = 180
-            elif any(w in lower for w in ["last month", "past month", "pichle mahine", "पिछले महीने"]):
-                slots.duration_days = 30
-            elif any(w in lower for w in ["last year", "pichle saal", "पिछले साल", "past year"]):
-                slots.duration_days = 365
-            elif any(w in lower for w in ["long time", "bahut din", "bahut samay", "बहुत दिन", "kaafi time"]):
-                slots.duration_days = 60
-            elif any(w in lower for w in ["recently", "haal hi mein", "हाल ही में", "just started"]):
-                slots.duration_days = 3
-
         # C. Comprehensive Itching
         if slots.has_itching is None:
             if any(w in lower for w in [
                 "खुजली नहीं", "no itch", "does not itch", "doesn't itch", "not itchy", "no itching",
-                "not achieved", "notes on teaching", "no itching at all", "khujli nahi"
+                "no itching at all", "khujli nahi"
             ]):
                 slots.has_itching = False
             elif any(w in lower for w in ["खुजली", "itching", "itch", "itchy", "खजुलाहट", "scratch", "scratching", "khujli", "khujali"]):
-                slots.has_itching = True
-            elif "yes" in lower and slots.body_site and slots.duration_days is not None:
                 slots.has_itching = True
 
         # D. Comprehensive Fever
@@ -434,18 +425,22 @@ class DialogueManager:
                 "kid", "kids", "घर में", "भाई", "बहन", "परिवार", "सबको", "bhai", "behen", "ghar me"
             ]):
                 # Make sure it's not negated with 'no'
-                if not any(neg in lower for neg in ["nobody", "no one", "nahi", "not"]):
+                if any(cue in lower for cue in ["itch", "rash", "same symptoms", "खुजली", "khujli"]) and not any(neg in lower for neg in ["nobody", "no one", "nahi", "not"]):
                     slots.household_contacts_affected = True
 
         # E2. Symptom Qualifiers (spreading, pain)
         if slots.is_spreading is None:
-            if any(w in lower for w in ["spreading", "getting bigger", "growing", "increasing", "expanding", "phail raha", "badh raha", "फैल रहा", "बढ़ रहा"]):
+            if any(w in lower for w in ["not spreading", "nahi phail raha", "नहीं फैल रहा"]):
+                slots.is_spreading = False
+            elif any(w in lower for w in ["spreading", "getting bigger", "growing", "increasing", "expanding", "phail raha", "badh raha", "फैल रहा", "बढ़ रहा"]):
                 slots.is_spreading = True
             elif any(w in lower for w in ["same size", "not spreading", "stable", "nahi phail raha", "नहीं फैल रहा"]):
                 slots.is_spreading = False
 
         if slots.has_pain is None:
-            if any(w in lower for w in ["pain", "painful", "hurts", "sore", "tender", "dard", "dard ho raha", "दर्द", "दर्दनाक", "takleef"]):
+            if any(w in lower for w in ["no pain", "painless", "not painful", "dard nahi", "दर्द नहीं"]):
+                slots.has_pain = False
+            elif any(w in lower for w in ["pain", "painful", "hurts", "sore", "tender", "dard", "dard ho raha", "दर्द", "दर्दनाक", "takleef"]):
                 slots.has_pain = True
             elif any(w in lower for w in ["no pain", "painless", "not painful", "dard nahi", "दर्द नहीं"]):
                 slots.has_pain = False

@@ -76,7 +76,7 @@ export const AICoreVisualizer: React.FC<AICoreVisualizerProps> = ({
     return `${r()}% ${r()}% ${r()}% ${r()}% / ${r()}% ${r()}% ${r()}% ${r()}%`;
   }, [phase]); // re-randomize per phase change
 
-  const isInteractive = phase === "idle" || phase === "listening" || phase === "error";
+  const isInteractive = phase === "idle" || phase === "listening" || phase === "speaking" || phase === "error";
 
   return (
     <div className="relative flex flex-col items-center justify-center select-none">
@@ -128,6 +128,7 @@ export const AICoreVisualizer: React.FC<AICoreVisualizerProps> = ({
 
       {/* ── CORE ORB (VapiBlocks-style reactive blob) ── */}
       <motion.button
+        aria-label={phase === "speaking" ? "Interrupt and speak" : phase === "listening" ? "Finish speaking" : "Start speaking"}
         onClick={isInteractive ? onTap : undefined}
         whileHover={isInteractive && !disabled ? { scale: 1.04 } : {}}
         whileTap={isInteractive && !disabled ? { scale: 0.93 } : {}}
@@ -144,11 +145,12 @@ export const AICoreVisualizer: React.FC<AICoreVisualizerProps> = ({
           boxShadow: { duration: 0.08 },
         }}
         disabled={disabled}
-        className={`relative z-10 flex items-center justify-center overflow-hidden focus:outline-none ${
+        className={`relative z-10 flex items-center justify-center overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-pink-400 ${
           isInteractive && !disabled ? "cursor-pointer" : "cursor-default"
         }`}
         style={{
-          background: `radial-gradient(circle at 40% 35%, ${colors.core}ee, ${colors.core}88 50%, ${colors.core}44 100%)`,
+          background: `radial-gradient(circle at 28% 22%, #c3caffaa, transparent 40%), radial-gradient(circle at 75% 70%, #f72585bb, transparent 65%), linear-gradient(145deg, ${colors.core}, #4361ee99 55%, #180c36)`,
+          border: "1px solid rgba(255,255,255,.24)",
         }}
       >
         {/* Inner bright hotspot */}

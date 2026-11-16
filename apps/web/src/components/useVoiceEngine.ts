@@ -37,6 +37,8 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
   }, [language]);
 
   const isListeningRef = useRef<boolean>(false);
+  const startingRef = useRef(false);
+  const recognitionPrefixRef = useRef("");
   const manualStopRef = useRef<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
@@ -109,7 +111,7 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
       isFlushedRef.current = true;
       console.log("[useVoiceEngine] Submitting turn -> Text:", textToSubmit, "Audio size:", recordedBase64.length);
       onFinalTranscriptRef.current(textToSubmit, recordedBase64 || undefined);
-    } else if (!hasBrowserSTT && recordedBase64 && recordedBase64.length > 3000) {
+    } else if (recordedBase64 && recordedBase64.length > 3000) {
       isFlushedRef.current = true;
       console.log("[useVoiceEngine] Submitting audio fallback turn -> Audio size:", recordedBase64.length);
       onFinalTranscriptRef.current("", recordedBase64);
@@ -186,12 +188,22 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
       try { recognitionRef.current.stop(); } catch (_) {}
       recognitionRef.current = null;
     }
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      await new Promise<void>((resolve) => {
+        recorder.addEventListener("stop", () => resolve(), { once: true });
+        recorder.stop();
+      });
+    }
     await flushTranscript();
     teardownAudio();
   }, [flushTranscript, teardownAudio]);
 
   // ── Start listening ──
   const startListening = useCallback(async () => {
+    if (isListeningRef.current || startingRef.current) return;
+    startingRef.current = true;
+    recognitionPrefixRef.current = "";
     manualStopRef.current = false;
     setPermissionError(null);
     latestSpeechRef.current = "";
@@ -204,6 +216,7 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err: any) {
+      startingRef.current = false;
       setPermissionError(
         err.name === "NotAllowedError" || err.name === "PermissionDeniedError"
           ? "Microphone access denied. Please allow microphone permissions in your browser bar."
@@ -213,6 +226,7 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
       setIsListening(false);
       return;
     }
+    startingRef.current = false;
     streamRef.current = stream;
 
     // 2. Build Web Audio pipeline for visual meter
@@ -281,7 +295,7 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
           }
         }
 
-        const activeText = (finalAccum + interim).trim();
+        const activeText = (recognitionPrefixRef.current + " " + finalAccum + interim).trim();
         if (activeText) {
           latestSpeechRef.current = activeText;
           setInterimTranscript(activeText);
@@ -296,7 +310,8 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
           // Give users 3.2s of silence if > 2 words, or 4.2s for short hesitations.
           // This completely prevents cutting the user off mid-sentence while they think!
           const wordCount = activeText.split(/\s+/).filter(Boolean).length;
-          const pauseThreshold = wordCount >= 3 ? 3200 : 4200;
+          const hesitant = /(?:um|uh|and|but|because|और|लेकिन|मतलब)[,. ]*$/i.test(activeText);
+          const pauseThreshold = hesitant || wordCount < 3 ? 5200 : 3200;
 
           silenceTimerRef.current = setTimeout(() => {
             console.log(`[useVoiceEngine] Auto-flushing on natural pause (${pauseThreshold}ms)`);
@@ -331,6 +346,7 @@ export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoi
         if (isListeningRef.current && !manualStopRef.current && !isFlushedRef.current) {
           console.log("[useVoiceEngine] Restarting recognition stream to prevent premature cutoff...");
           try {
+            recognitionPrefixRef.current = latestSpeechRef.current;
             recognition.start();
           } catch (err) {
             console.warn("[useVoiceEngine] Could not restart recognition:", err);

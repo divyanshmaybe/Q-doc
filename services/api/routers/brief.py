@@ -55,6 +55,6 @@ def review_clinician_brief(session_id: str, req: DoctorReviewRequest):
         "success": True,
         "brief_id": brief_id,
         "approved": req.approved,
-        "message": "Doctor sign-off recorded successfully"
+        "message": "Review note recorded. A treatment plan is released only through the authenticated care-plan signing workflow."
     }
 
