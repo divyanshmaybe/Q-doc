@@ -104,10 +104,16 @@ class ConsultationPlanner:
             slots.fact_status[field] = "denied" if value is False else "reported"
             if field in slots.pending_clarifications:
                 slots.pending_clarifications.remove(field)
-        if slots.last_question_field == "safety_screen_complete" and lower in (
-            "no", "none", "none of these", "no to all", "नहीं", "nahi", "नहीं इनमें से कुछ नहीं"
-        ):
-            slots.safety_screen_complete = True
+        if slots.last_question_field == "safety_screen_complete":
+            if lower in (
+                "no", "none", "none of these", "no to all", "नहीं", "nahi", "नहीं इनमें से कुछ नहीं",
+                "nothing like that", "neither", "neither of those", "none of them", "nothing"
+            ) or any(term in lower for term in (
+                "no trouble breathing", "no breathing difficulty", "there was no trouble breathing",
+                "no mouth sores", "no eye sores", "no skin peeling", "nothing like that", "no sores",
+                "no issues with breathing"
+            )):
+                slots.safety_screen_complete = True
         if any(word in lower for word in ("not achieved", "notes on teaching")):
             if "has_itching" not in slots.pending_clarifications:
                 slots.pending_clarifications.append("has_itching")

@@ -124,6 +124,13 @@ class DialogueManager:
         negative = answer in ("no", "nope", "nahi", "nahin", "नहीं", "none", "none of these", "no to all")
         direct_fields = ("has_fever", "has_itching", "has_pain", "is_spreading",
                          "household_contacts_affected", "safety_screen_complete")
+        if question_field == "safety_screen_complete":
+            if negative or any(term in answer for term in (
+                "no trouble breathing", "no breathing difficulty", "there was no trouble breathing",
+                "no mouth sores", "no eye sores", "no skin peeling", "nothing like that",
+                "neither", "none of these", "none of them", "no issues", "no sores", "nothing"
+            )):
+                negative = True
         if question_field in direct_fields and (affirmative or negative):
             norm_res = {"ambiguous_fields": []}
             if question_field == "safety_screen_complete":
@@ -337,17 +344,21 @@ class DialogueManager:
                 ],
                 "hi": ["बाजू", "बांह", "कोहनी", "कंधा", "कंधे", "बगल", "कांख", "kandha"]
             },
+            "neck": {
+                "en": [r"\bnecks?\b", r"\bthroat\b", r"\bnape\b"],
+                "hi": ["गर्दन", "गला", "gardan"]
+            },
             "face": {
                 "en": [
                     r"\bface\b", r"\bcheeks?\b", r"\bforehead\b", r"\bchin\b",
                     r"\bnose\b", r"\blips?\b", r"\bmouth\b", r"\bears?\b",
-                    r"\bscalp\b", r"\bhead\b", r"\bnecks?\b", r"\bthroat\b",
-                    r"\bhairline\b", r"\bnape\b", r"\bbehind\s+(?:my\s+)?ears?\b",
+                    r"\bscalp\b", r"\bhead\b",
+                    r"\bhairline\b", r"\bbehind\s+(?:my\s+)?ears?\b",
                     r"\bjaw(?:line)?\b", r"\btemples?\b", r"\beyelids?\b"
                 ],
                 "hi": [
-                    "चेहरा", "चेहरे", "गाल", "माथा", "नाक", "होंठ", "मुंह", "कान", "सिर", "गर्दन", "गला",
-                    "chehra", "gardan", "jawline", "thodi", "palakon", "kaanon ke peeche"
+                    "चेहरा", "चेहरे", "गाल", "माथा", "नाक", "होंठ", "मुंह", "कान", "सिर",
+                    "chehra", "jawline", "thodi", "palakon", "kaanon ke peeche"
                 ]
             },
             "torso": {
