@@ -35,6 +35,7 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+*.bak
 qdoc.db
 services/api/qdoc.db
 services/api/uploads/
