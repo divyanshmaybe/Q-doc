@@ -124,64 +124,35 @@ class DialogueManager:
         negative = answer in ("no", "nope", "nahi", "nahin", "नहीं", "none", "none of these", "no to all")
         direct_fields = ("has_fever", "has_itching", "has_pain", "is_spreading",
                          "household_contacts_affected", "safety_screen_complete")
-        if question_field == "safety_screen_complete":
-            if negative or any(term in answer for term in (
-                "no trouble breathing", "no breathing difficulty", "there was no trouble breathing",
-                "no mouth sores", "no eye sores", "no skin peeling", "nothing like that",
-                "neither", "none of these", "none of them", "no issues", "no sores", "nothing"
-            )):
-                negative = True
-        if question_field in direct_fields and (affirmative or negative):
-            norm_res = {"ambiguous_fields": []}
-            if question_field == "safety_screen_complete":
-                if negative:
-                    norm_res["safety_screen_complete"] = True
-                # A positive composite answer needs clarification, not an invented symptom.
-            else:
-                norm_res[question_field] = affirmative
-        else:
-            norm_res = self.normalizer.normalize(user_utterance, context or question_field, lang)
-        # A field is uncertain only when the patient is discussing that field.
-        # Pronouns in an answer ("it itches") do not invalidate a known body site.
-        cue_patterns = {
-            "body_site": r"\b(where|location|site|thighs?|legs?|arms?|hands?|face|groin|pubic|neck|back|chest|feet|foot|scalp)\b|हाथ|पैर|चेहर|जांघ",
-            "duration_days": r"\b(days?|weeks?|months?|years?|since|duration|ago)\b|दिन|हफ्त|महीन|साल",
-            "age": r"\b(age|old)\b|उम्र|आयु",
-            "has_itching": r"\b(itch\w*|scratch\w*)\b|खुजली|khujli",
-            "has_pain": r"\b(pain\w*|hurt\w*|sore|tender)\b|दर्द|dard",
-            "has_fever": r"\b(fever|chills|temperature)\b|बुखार|bukhar",
-            "is_spreading": r"\b(spread\w*|grow\w*|bigger|expanding|changing)\b|फैल|phail",
-            "household_contacts_affected": r"\b(family|household|brother|sister|partner|roommate|anyone|others)\b|घर|परिवार",
-        }
-        discussed = {field for field, pattern in cue_patterns.items()
-                     if re.search(pattern, user_utterance, re.IGNORECASE)}
-        ambiguous = norm_res.get("ambiguous_fields", [])
-        norm_res["ambiguous_fields"] = [field for field in ambiguous
-            if field == question_field or field in discussed] if isinstance(ambiguous, list) else []
-        # Do not accept model-inferred negatives for symptoms the patient did not mention.
-        for field in ("has_pain", "has_itching", "has_fever", "is_spreading", "household_contacts_affected"):
-            if field not in discussed and not (field == question_field and (affirmative or negative)):
-                norm_res.pop(field, None)
-        # A new explicit symptom can resolve a prior spurious clarification about
-        # an already recorded, unrelated fact without discarding the fact itself.
-        current_slots.pending_clarifications = [field for field in current_slots.pending_clarifications
-            if getattr(current_slots, field, None) is None or field in discussed]
+
+        # LLM-First Understanding: Always invoke the LLM to understand conversational nuance
+        norm_res = self.normalizer.normalize(user_utterance, context or question_field, lang)
+
+        # Fallback to direct simple mapping only if LLM is offline or returns fallback
+        if norm_res.get("status") == "fallback":
+            if question_field in direct_fields and (affirmative or negative):
+                if question_field == "safety_screen_complete":
+                    if negative:
+                        norm_res["safety_screen_complete"] = True
+                else:
+                    norm_res[question_field] = affirmative
+
         norm_res["raw_transcript"] = user_utterance
         norm_res["clean_meaning"] = user_utterance
-        # Parse this utterance independently so patient corrections can replace prior facts.
+
+        # Only use offline rule extraction for slots where LLM returned None
         fresh = ClinicalIntakeSlots(primary_language=current_slots.primary_language)
         self._extract_slots(user_utterance, fresh, lang, question_field)
         for field in ("body_site", "lesion_type", "duration_days", "age", "has_itching",
                       "has_fever", "household_contacts_affected", "has_pain", "is_spreading"):
-            value = getattr(fresh, field)
-            if value is not None:
-                norm_res[field] = value
-                # Explicit local extraction resolves model uncertainty for this fact.
-                ambiguous = norm_res.get("ambiguous_fields", [])
-                if isinstance(ambiguous, list):
-                    norm_res["ambiguous_fields"] = [item for item in ambiguous if item != field]
+            if norm_res.get(field) is None:
+                value = getattr(fresh, field)
+                if value is not None:
+                    norm_res[field] = value
+
         if question_field in ("prior_treatments", "patient_concern", "daily_impact", "treatment_barriers", "nocturnal_itch", "triggers"):
-            norm_res[question_field] = user_utterance
+            if norm_res.get(question_field) is None:
+                norm_res[question_field] = user_utterance
         # Explicit safety phrases are handled even when the language service is unavailable.
         lower = user_utterance.lower()
         for field, positives, negatives in (

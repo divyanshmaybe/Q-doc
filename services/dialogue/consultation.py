@@ -105,24 +105,20 @@ class ConsultationPlanner:
             if field in slots.pending_clarifications:
                 slots.pending_clarifications.remove(field)
         if slots.last_question_field == "safety_screen_complete":
-            if lower in (
-                "no", "none", "none of these", "no to all", "नहीं", "nahi", "नहीं इनमें से कुछ नहीं",
-                "nothing like that", "neither", "neither of those", "none of them", "nothing"
-            ) or any(term in lower for term in (
-                "no trouble breathing", "no breathing difficulty", "there was no trouble breathing",
-                "no mouth sores", "no eye sores", "no skin peeling", "nothing like that", "no sores",
-                "no issues with breathing"
-            )):
+            if intent.get("safety_screen_complete") is True or (
+                raw.strip() and intent.get("breathing_difficulty") is not True and intent.get("mucosal_involvement") is not True
+            ):
                 slots.safety_screen_complete = True
         if any(word in lower for word in ("not achieved", "notes on teaching")):
             if "has_itching" not in slots.pending_clarifications:
                 slots.pending_clarifications.append("has_itching")
         if any(word in lower for word in ("no photo", "cannot take a photo", "skip photo", "फोटो नहीं")):
             slots.photo_declined = True
-        if slots.consultation_stage == "summary" and lower in (
-            "yes", "correct", "that's right", "that is right", "yes correct", "हाँ", "हां", "haan", "sahi hai"
-        ):
-            slots.summary_confirmed = True
+        if slots.consultation_stage == "summary":
+            if intent.get("summary_confirmed") is True or lower in (
+                "yes", "correct", "that's right", "that is right", "yes correct", "हाँ", "हां", "haan", "sahi hai", "all good", "looks good", "fine", "confirm"
+            ):
+                slots.summary_confirmed = True
 
         def respond(action, stage, message, field=None):
             slots.planned_action = action
