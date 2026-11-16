@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd apps/web && npm install && npm run build"
+    "build": "sh -c 'if [ -d apps/web ]; then cd apps/web && npm install && npm run build; else npm run build; fi'"
   }
 }
-
