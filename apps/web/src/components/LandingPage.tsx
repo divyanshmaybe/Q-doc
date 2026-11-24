@@ -1,60 +1,63 @@
+import { QDocWordmark } from "./QDocWordmark";
 import React from "react";
-import { ArrowRight, AudioLines, Camera, ClipboardList, Stethoscope, ShieldCheck, MessageCircle, Mail, Plus, Check } from "lucide-react";
+import { Plus, Volume2, Flag, Monitor, HeartPulse, Map, Users, Play, ChevronDown } from "lucide-react";
 import "./LandingPage.css";
+import { VentureStory } from "./VentureStory";
+import { TeamPortrait } from "./TeamPortrait";
 
-interface LandingPageProps {
-  onLaunchDemo: () => void;
-  onOpenClinician: () => void;
+interface LandingPageProps { onLaunchDemo: () => void; onOpenClinician: () => void; }
+function CareWorld() {
+  return <svg className="care-world" viewBox="0 0 900 620" role="img" aria-labelledby="world-title">
+    <title id="world-title">An illustrated block-built community, connected by a path to a Q-Doc kiosk and hospital</title>
+    <defs>
+      <pattern id="grass" width="46" height="26" patternUnits="userSpaceOnUse"><rect width="46" height="26" fill="#414e8a"/><path d="M5 6h8m20 13h6" stroke="#5869a8" strokeWidth="3"/></pattern>
+      <g id="tree"><path d="M-5 0v-49h12V0" fill="#76543e"/><path d="m-32-47 0-35 30-16 32 16v35L0-30Z" fill="#43539b"/><path d="m-32-82 30-16 32 16L0-65Z" fill="#8294ed"/><path d="M0-65v35l30-17v-35Z" fill="#303f78"/></g>
+      <g id="person"><ellipse cy="5" rx="14" ry="6" fill="#263a3426"/><path d="M-6-2v-14h5v14m4 0v-14h5v14" stroke="#293c43" strokeWidth="5"/><path d="M-10-17v-23h20v23" fill="currentColor"/><path d="M-7-42h14v17H-7Z" fill="#e6b486"/><path d="M-8-42h16v6H-8Z" fill="#373c36"/></g>
+    </defs>
+    <g className="world-cloud" fill="#343e6c"><path d="M98 91h27V73h47v13h35v22H98Z"/><path d="M653 52h30V33h52v16h31v19H653Z"/></g>
+    <path d="m72 353 366-199 389 207-366 212Z" fill="#263e36" opacity=".13" transform="translate(0 28)"/>
+    <path d="m72 319 366-199 389 207-366 212Z" fill="url(#grass)"/>
+    <path d="M72 319v48l389 215v-48Z" fill="#323851"/><path d="m461 534 366-207v48L461 582Z" fill="#222638"/>
+    <path d="M72 319v13l389 215v-13Zm389 215v13l366-207v-13Z" fill="#5668b0"/>
+    <path d="m169 369 249-137 40 22-250 137Z" fill="#9ba4cb"/><path d="m331 281 42-23 298 162-43 25Z" fill="#9ba4cb"/><path d="m435 486 165-92 39 21-165 93Z" fill="#9ba4cb"/>
+    <path d="m184 369 230-128m-54 32 277 153m-181 68 159-88" fill="none" stroke="#c9d1f2" strokeWidth="3" strokeDasharray="10 12"/>
+    <g transform="translate(592 255)">
+      <path d="m-83-33 101-56 102 56-101 58Z" fill="#dce2ff"/><path d="M-83-33v91L19 116V25Z" fill="#b9c4ed"/><path d="m19 25 101-58v91L19 116Z" fill="#7b8ab9"/>
+      <path d="m-92-40 111-61 111 61-111 63Z" fill="#f72585"/><path d="M-92-40v12L19 35V23Zm111 63v12l111-63v-12Z" fill="#a71c60"/>
+      <path d="M-60-7v39l28 16V9Zm43 25v39L9 72V33Z" fill="#527b7b"/><path d="m40 38 27-15v71L40 109Z" fill="#3e625d"/><path d="m81 14 22-13v33L81 47Z" fill="#527b7b"/>
+      <path d="m-6-64 14-8 14 8v-17l14 8v17l14 8-14 8-14-8v17l-14-8v-17Z" fill="#fff8df"/>
+    </g>
+    <g transform="translate(260 248)"><path d="m-56-12 65-36 63 35L7 24Z" fill="#efbd70"/><path d="M-56-12v59L7 83V24Z" fill="#f3e3b5"/><path d="m7 24 65-37v59L7 83Z" fill="#c4b181"/><path d="m-65-14 36-61 46 1 64 57L7 22Z" fill="#49757d"/><path d="m-65-14 36-61L7-40v62Z" fill="#6c9695"/><path d="M-40 13v21l18 10V23Z" fill="#799e9b"/><path d="m23 33 22-12v41L23 74Z" fill="#64523d"/></g>
+    <g transform="translate(463 385)"><path d="m-58 0 57-32L59 0 1 34Z" fill="#b4c4a0"/><path d="M-58 0v10L1 44V34Zm59 34v10L59 10V0Z" fill="#7e9774"/>
+      <path d="M-28-105 7-124 38-106 3-86Z" fill="#faf7da"/><path d="M-28-105v105L3 18V-86Z" fill="#eeeacc"/><path d="m3-86 35-20V-2L3 18Z" fill="#a5b9a3"/>
+      <path d="M-21-92v49L-3-33v-49Z" fill="#274d49"/><path d="m-17-69 3 2 3-7 4 17" fill="none" stroke="#ff72b1" strokeWidth="2"/><path d="M-19-24v6l15 8v-6Z" fill="#537b65"/><path d="M11-77v38l17-10v-38Z" fill="#729c83"/>
+    </g>
+    {[[151,310],[367,190],[706,342],[743,317],[345,457],[265,410],[547,489],[767,365]].map(([x,y])=><use key={`${x}-${y}`} href="#tree" x={x} y={y}/>)}
+    <use href="#person" x="393" y="367" color="#e9a84e"/><use href="#person" x="510" y="420" color="#e77958"/><use href="#person" x="589" y="349" color="#f3edcf"/><use href="#person" x="224" y="343" color="#60869e"/>
+    <g fill="#ff72b1"><path d="M305 349h6v6h-6Zm321 119h6v6h-6Zm-297 2h6v6h-6ZM181 297h6v6h-6Z"/></g>
+    <g fill="#727cff"><path d="M119 350h12v5h-12Zm378 172h14v5h-14Zm221-134h12v5h-12Z"/></g>
+  </svg>;
 }
 
-const steps = [
-  { icon: MessageCircle, title: "Start with your story", text: "Describe the skin concern in Hindi or English, by voice or text. Q-Doc asks about symptoms, timing, previous treatments, and how the problem affects your day." },
-  { icon: Camera, title: "Add a photo, if comfortable", text: "A clear photograph adds visual context to your history. You can skip this step and continue toward an in-person examination." },
-  { icon: ClipboardList, title: "Review the next step", text: "Confirm the details you shared, then receive a provisional screening assessment or a recommendation for clinical review." },
-];
-
-export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchDemo, onOpenClinician }) => (
-  <div className="qdoc-landing">
+export const LandingPage: React.FC<LandingPageProps> = ({ onLaunchDemo, onOpenClinician }) => {
+  return <div className="qdoc-landing" id="top">
     <a className="landing-skip" href="#landing-main">Skip to content</a>
-    <header className="landing-nav">
-      <div className="landing-container landing-nav-inner">
-        <a href="#" className="landing-brand" aria-label="Q-Doc home"><span className="brand-symbol"><Plus size={23} /></span>Q-Doc<span className="brand-caption">SKIN SCREENING</span></a>
-        <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#clinical">For clinicians</a><a href="#about">About</a></nav>
-        <button className="landing-button compact" onClick={onLaunchDemo}>Try the demo <ArrowRight size={15} /></button>
-      </div>
-    </header>
+    <header className="venture-nav"><a className="venture-brand" href="#top"><QDocWordmark /><span className="brand-location">BUILT IN VARANASI</span></a><nav aria-label="Main navigation"><a href="#story">The story</a><a href="#vision">The vision</a><a href="#team">The people</a></nav><button className="world-button small" onClick={onLaunchDemo}><Play size={14} fill="currentColor"/> Enter demo</button></header>
     <main id="landing-main">
-      <section className="landing-hero landing-container" aria-labelledby="landing-title">
-        <div className="hero-copy">
-          <div className="landing-eyebrow"><span className="pink-dot" /> VOICE-FIRST DERMATOLOGY SCREENING</div>
-          <h1 id="landing-title">Better skin care<br />starts with<br /><em>being heard.</em></h1>
-          <p className="hero-description">Describe what’s changed. Share what concerns you. Q-Doc brings your symptoms and skin photographs together to help prepare for the next step in care.</p>
-          <div className="landing-actions"><button className="landing-button" onClick={onLaunchDemo}>Explore the screening demo <ArrowRight size={17} /></button><a className="landing-text-link" href="#how">See how it works <span>↘</span></a></div>
-          <p className="hero-note">An early-stage screening prototype. Clinical examination and treatment decisions remain with a qualified clinician.</p>
-        </div>
-        <div className="landing-preview" aria-label="Illustrative preview of a Q-Doc conversation">
-          <div className="preview-top"><span><span className="pink-dot" /> Q-DOC CONSULTATION</span><span>Example conversation</span></div>
-          <div className="preview-orb-scene" aria-hidden="true"><div className="preview-orbit" /><div className="preview-orbit outer" /><div className="preview-orb"><AudioLines size={42} strokeWidth={1.2} /></div><span className="preview-orb-label">SPACE TO TALK. TIME TO LISTEN.</span></div>
-          <div className="preview-chat patient"><span>YOU</span><p>“The itching keeps waking me up at night.”</p></div>
-          <div className="preview-chat assistant"><span><span className="tiny-cross">+</span> Q-DOC</span><p>“That sounds uncomfortable. When did the itching first begin?”</p></div>
-          <div className="preview-input"><AudioLines size={16} /><span>Speak or type in your own words</span><span className="preview-send"><ArrowRight size={15} /></span></div>
-        </div>
+      <section className="venture-hero" aria-labelledby="landing-title">
+        <div className="hero-horizon" aria-hidden="true"/>
+        <div className="venture-hero-copy"><span className="world-label"><span className="label-block"/> VOICE-FIRST CARE. BUILT FOR INDIA.</span><h1 id="landing-title">Less waiting.<br/>More <span>living.</span></h1><p>We’re building a better first step into healthcare.<br className="desktop-break"/> A voice-first health kiosk. Your own language.<br className="desktop-break"/> A clearer path to the care you need.</p><div className="world-actions"><a className="world-button" href="#story"><Map size={18}/> Explore our story</a><button className="world-link" onClick={onLaunchDemo}>Try the prototype <Play size={13}/></button></div><span className="hero-footnote">ROOTED IN INDIA. BUILDING ONE STEP AT A TIME.</span></div>
+        <div className="world-scene"><span className="world-coordinate">THE WORLD WE’RE WORKING TOWARD</span><CareWorld/><a className="world-pin pin-village" href="#story"><span>⌂</span> The community</a><a className="world-pin pin-hospital" href="#vision"><Plus size={15}/> The care team</a><button className="world-pin pin-kiosk" onClick={onLaunchDemo}><span className="pin-beacon"/> Meet Q-Doc <Play size={12}/></button><span className="world-caption">Concept illustration: a Q-Doc kiosk near a public hospital.</span></div>
+        <a className="scroll-invite" href="#story"><ChevronDown size={18}/> THERE’S A STORY BEHIND THE BUILD</a>
       </section>
-      <div className="landing-capabilities landing-container" aria-label="Current prototype capabilities">
-        <span><AudioLines />Hindi &amp; English</span><span><Camera />Symptoms + photographs</span><span><ClipboardList />Structured case summaries</span><span><Stethoscope />Clinician review workflow</span>
-      </div>
-      <section className="landing-section landing-container" id="how" aria-labelledby="how-title">
-        <div className="section-intro"><div><span className="landing-eyebrow">01 / THE EXPERIENCE</span><h2 id="how-title">A conversation with<br /><em>a clear structure.</em></h2></div><p>Good screening begins with context. Q-Doc gathers the details step by step and gives you a chance to correct them before preparing an assessment.</p></div>
-        <div className="landing-step-grid">{steps.map(({ icon: Icon, title, text }, index) => <article className="landing-step" key={title}><div className="step-top"><Icon size={23} strokeWidth={1.4} /><span>0{index + 1}</span></div><h3>{title}</h3><p>{text}</p></article>)}</div>
+      <div className="venture-ribbon"><span>VOICE FIRST</span><Plus/><span>PEOPLE AT THE CENTRE</span><Plus/><span>CARE CLOSER TO HOME</span><Plus/><span>BUILT TO BE UNDERSTOOD</span></div>
+      <section className="venture-section story-section" id="story" aria-labelledby="story-title"><div className="section-heading"><span className="world-label">THE Q-DOC JOURNEY</span><h2 id="story-title">It started in<br/>a <em>waiting room.</em></h2></div>
+        <VentureStory />
       </section>
-      <section className="clinical-section" id="clinical" aria-labelledby="clinical-title"><div className="landing-container clinical-layout">
-        <div className="clinical-copy"><span className="landing-eyebrow">02 / FOR THE CARE TEAM</span><h2 id="clinical-title">The patient’s story.<br /><em>Ready for review.</em></h2><p>Q-Doc is being developed to support the intake stage of a dermatology visit. The clinician portal brings the symptom history, image findings, and screening output into one case brief.</p><ul><li><Check />Review the history and reported symptoms.</li><li><Check />Inspect possible conditions and flagged concerns.</li><li><Check />Record approval or add a clinical override.</li></ul><button className="landing-button secondary" onClick={onOpenClinician}>Explore the clinician portal <ArrowRight size={16} /></button></div>
-        <div className="brief-preview"><div className="brief-title"><ClipboardList size={20} /><div><strong>One case. A structured overview.</strong><span>Illustrative case brief</span></div></div><div className="brief-row"><span>Patient history</span><strong>Concern · onset · symptoms</strong></div><div className="brief-row"><span>Visual context</span><strong>Photograph &amp; image quality</strong></div><div className="brief-row"><span>Screening assessment</span><strong>Possible conditions &amp; uncertainty</strong></div><div className="brief-row"><span>Clinical review</span><strong>Notes, approval, or override</strong></div><div className="brief-bottom"><ShieldCheck size={17} /><span>Clinical judgment stays with the care team.</span></div></div>
-      </div></section>
-      <section className="landing-section landing-container scope-layout" aria-labelledby="scope-title"><div><span className="landing-eyebrow">03 / BUILT WITH BOUNDARIES</span><h2 id="scope-title">Clear about its role.<br /><em>Honest about its limits.</em></h2><p className="scope-lead">Q-Doc is a working prototype focused on skin screening. Clinical validation and real-world evaluation are still needed before routine patient use.</p></div><div className="scope-list"><article><span>01</span><div><h3>A provisional assessment</h3><p>Symptoms and photos can support screening. They cannot confirm a diagnosis or replace a physical examination.</p></div></article><article><span>02</span><div><h3>A route to further care</h3><p>Reported warning signs or unclear findings can prompt advice to seek clinical assessment. Q-Doc does not arrange emergency care.</p></div></article><article><span>03</span><div><h3>Treatment requires review</h3><p>The current patient-facing flow recommends clinician review before starting or changing medication.</p></div></article></div></section>
-      <section className="landing-container" id="about" aria-labelledby="about-title"><div className="landing-about"><div><span className="landing-eyebrow">THE PROJECT / Q-DOC</span><h2 id="about-title">Building a more useful<br />first step in skin care.</h2><p>Q-Doc’s goal is to make symptom collection easier for patients and more useful for care teams. We’re starting with dermatology, conversational intake, and a reviewable clinical summary.</p><div className="founder-line"><span className="founder-avatar">DS</span><div><strong>Divyansh Soni</strong><span>Founder · Mathematics &amp; Computing, IIT BHU</span></div></div></div><div className="contact-panel"><Mail size={24} /><h3>Help shape what comes next.</h3><p>We welcome conversations with clinicians, researchers, and potential pilot partners about clinical workflows, evaluation, and patient experience.</p><a className="landing-text-link" href="mailto:founder@q-doc.live">founder@q-doc.live <ArrowRight size={16} /></a></div></div></section>
-      <section className="landing-container landing-final"><span className="landing-eyebrow">TAKE A LOOK INSIDE</span><h2>See the conversation in action.</h2><p>Explore how Q-Doc collects a skin history and prepares the next step.</p><button className="landing-button" onClick={onLaunchDemo}>Try the screening demo <ArrowRight size={17} /></button></section>
-    </main>
-    <footer className="landing-container landing-footer"><a className="landing-brand" href="#"><span className="brand-symbol"><Plus size={20} /></span>Q-Doc</a><p>Dermatology screening prototype · Founded 2026</p><a href="mailto:founder@q-doc.live">Get in touch <ArrowRight size={14} /></a></footer>
-  </div>
-);
+      <section className="vision-section" id="vision" aria-labelledby="vision-title"><div className="venture-section"><div className="vision-header"><div><span className="world-label">THE BIGGER PICTURE</span><h2 id="vision-title">One first step.<br/>More ways to care.</h2></div><p>The vision is a walk-up health kiosk in a public hospital, helping patients explain what’s wrong and helping care teams decide what comes next.</p></div><div className="vision-path"><article><Volume2/><span className="world-label">SPEAK</span><h3>In your own words.</h3><p>A conversation in a familiar language, designed for people who would rather speak than fill out a form.</p></article><article><HeartPulse/><span className="world-label">UNDERSTAND</span><h3>Bring the pieces together.</h3><p>Our roadmap brings symptom history, basic vitals, and connected health records into one place.</p></article><article><Users/><span className="world-label">CONNECT</span><h3>A useful next step.</h3><p>Give the care team a structured starting point, with attention to cases that need further assessment.</p></article></div><p className="vision-note">The kiosk, vitals sensors, and ABDM integration are planned capabilities, still to be built and evaluated.</p></div></section>
+      <section className="venture-section demo-section" id="prototype" aria-labelledby="demo-title"><div className="demo-terminal"><div className="terminal-bar"><span>Q-DOC / PROTOTYPE</span><Monitor size={17}/></div><div className="terminal-body"><span className="terminal-cross" aria-hidden="true">✚</span><p className="terminal-greeting">Hello. नमस्ते.</p><p>Let’s start with your story.</p><div className="terminal-wave" aria-hidden="true">{[12,24,16,38,54,30,18,44,64,36,22,46,26,14,30,16].map((h,i)=><i key={i} style={{height:h}}/>)}</div><span className="terminal-language">HINDI + ENGLISH</span></div><button onClick={onLaunchDemo}><Play size={16} fill="currentColor"/> START A CONVERSATION</button></div><div className="demo-copy"><span className="world-label">TRY IT TODAY / THE FIRST BUILD</span><h2 id="demo-title">Try a skin<br/><em>screening conversation.</em></h2><p>Try our voice-and-photo skin screening prototype. It’s a small, working part of the wider Q-Doc idea: listen to a patient, collect context, and prepare a case for review.</p><p className="demo-boundary">An early prototype, not a clinically validated service. It doesn’t replace a clinician’s examination or treatment advice.</p><div className="world-actions"><button className="world-button" onClick={onLaunchDemo}>Try the demo</button><button className="world-link" onClick={onOpenClinician}>Open clinician view</button></div></div></section>
+      <section className="team-section venture-section" id="team" aria-labelledby="team-title"><div className="section-heading"><span className="world-label">THE TEAM BEHIND Q-DOC</span><h2 id="team-title">Meet the team<br/>in Varanasi.</h2><p>Three students at IIT BHU building Q-Doc.</p></div><div className="team-list">{[{name:"Divyansh Soni",course:"Mathematics & Computing",initials:"DS"},{name:"Divyansh Srivastava",course:"Civil Engineering",initials:"DS"},{name:"Sanil",course:"Mechanical Engineering",initials:"S"}].map((person,i)=><article key={person.name}><span className="team-portrait"><TeamPortrait index={i} /></span><div><h3>{person.name}</h3><p>{person.course}</p><span>IIT BHU · Varanasi</span></div></article>)}</div></section>
+      <section className="join-section"><div><span className="world-label">THE NEXT CHAPTER IS OPEN</span><h2>Help us build<br/>what comes next.</h2><p>Clinician, hospital team, hardware builder, or simply curious?<br/>Help shape a useful first step for patients and care teams.</p><a className="world-button" href="mailto:founder@q-doc.live">Let’s talk</a><a className="join-email" href="mailto:founder@q-doc.live">founder@q-doc.live</a></div><div className="join-flag" aria-hidden="true"><Flag size={115} strokeWidth={1.5}/><span>STILL BUILDING.<br/>ALWAYS LEARNING.</span></div></section>
+    </main><footer className="venture-footer"><a className="venture-brand" href="#top"><QDocWordmark /></a><p>A better beginning for healthcare.</p><a href="#top">Back to the surface</a></footer>
+  </div>;
+};

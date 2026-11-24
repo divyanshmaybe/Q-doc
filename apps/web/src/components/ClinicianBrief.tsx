@@ -12,7 +12,6 @@ import {
   Clock,
   UserCheck,
   CheckCircle2,
-  Stethoscope,
   BookOpen,
   Pill,
   Copy,
@@ -40,12 +39,11 @@ export const ClinicianBrief: React.FC<ClinicianBriefProps> = ({
   if (!briefData) {
     return (
       <div className="glass-panel rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 border border-white/5">
-        <Stethoscope className="w-10 h-10 text-slate-600 stroke-[1.5]" />
         <span className="font-mono text-xs uppercase tracking-wider text-slate-400">
-          CLINICAL HUD INACTIVE
+          Select a case
         </span>
-        <p className="text-xs text-slate-500 max-w-sm">
-          No active case selected from incoming queue. Select a screening session to review the multimodal telemetry.
+        <p className="text-sm text-slate-300 max-w-sm">
+          Choose a screening session from the case queue to see its summary.
         </p>
       </div>
     );

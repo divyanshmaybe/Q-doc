@@ -21,6 +21,8 @@ import { useVoiceEngine } from "./components/useVoiceEngine";
 import { AgentTranscript } from "./components/AgentTranscript";
 import { SlotDrawer } from "./components/SlotDrawer";
 import { CameraCapture } from "./components/CameraCapture";
+import { QDocWordmark } from "./components/QDocWordmark";
+import { DoctorPortrait } from "./components/DoctorPortrait";
 import { ClinicianBrief } from "./components/ClinicianBrief";
 import { LandingPage } from "./components/LandingPage";
 import { CareWorkflow } from "./components/CareWorkflow";
@@ -39,10 +41,8 @@ import {
   ClinicianBriefItem,
 } from "./services/api";
 
-const DEFAULT_WELCOME_EN =
-  "Hello, I am Q-Doc, your skin screening assistant. Please note: I am a screening aid, not a doctor. What skin issue are you experiencing, and where on your body is it located?";
-const DEFAULT_WELCOME_HI =
-  "नमस्ते, मैं क्यू-डॉक हूँ, आपका त्वचा स्क्रीनिंग सहायक। कृपया ध्यान दें: यह एक स्क्रीनिंग सहायता है, डॉक्टर नहीं। बताइए, आपकी त्वचा में क्या परेशानी हो रही है और यह किस अंग पर है?";
+const DEFAULT_WELCOME_EN = "Hello, I’m Q-Doc. I’m here to help you with any skin concerns you’re having. What skin issue are you facing and where on the body?";
+const DEFAULT_WELCOME_HI = "नमस्ते, मैं क्यू-डॉक हूँ। मैं आपकी त्वचा से जुड़ी परेशानी समझने में मदद कर सकता हूँ। मैं शुरुआती जाँच में मदद करता हूँ, और डॉक्टर इसकी पुष्टि कर सकते हैं। आपने क्या बदलाव देखा है?";
 
 const b64ToBlobUrl = (base64: string): string => {
   try {
@@ -88,7 +88,7 @@ export const App: React.FC = () => {
   const agentMessageRef = useRef<string | null>(DEFAULT_WELCOME_EN);
   const [latestAudioB64, setLatestAudioB64] = useState<string | null>(() => {
     try {
-      return localStorage.getItem("qdoc_welcome_b64_en-IN") || null;
+      return localStorage.getItem("qdoc_welcome_v4_b64_en-IN") || null;
     } catch (_) {
       return null;
     }
@@ -490,7 +490,7 @@ export const App: React.FC = () => {
 
     // Load cached audio from localStorage if available
     try {
-      const cachedB64 = localStorage.getItem("qdoc_welcome_b64_" + targetLang);
+      const cachedB64 = localStorage.getItem("qdoc_welcome_v4_b64_" + targetLang);
       if (cachedB64) {
         setLatestAudioB64(cachedB64);
         latestAudioB64Ref.current = cachedB64;
@@ -519,7 +519,7 @@ export const App: React.FC = () => {
       // Save to localStorage for instant subsequent launches
       if (res.audio?.audio_base64) {
         try {
-          localStorage.setItem("qdoc_welcome_b64_" + (res.language || targetLang), res.audio.audio_base64);
+          localStorage.setItem("qdoc_welcome_v4_b64_" + (res.language || targetLang), res.audio.audio_base64);
         } catch (_) {}
       }
 
@@ -561,7 +561,7 @@ export const App: React.FC = () => {
 
     let welcomeB64: string | null = null;
     try {
-      welcomeB64 = localStorage.getItem("qdoc_welcome_b64_" + targetLang);
+      welcomeB64 = localStorage.getItem("qdoc_welcome_v4_b64_" + targetLang);
     } catch (_) {}
     if (!welcomeB64) {
       welcomeB64 = latestAudioB64Ref.current;
@@ -591,7 +591,7 @@ export const App: React.FC = () => {
         latestAudioB64Ref.current = res.audio.audio_base64;
         setLatestAudioB64(res.audio.audio_base64);
         try {
-          localStorage.setItem("qdoc_welcome_b64_" + (res.language || targetLang), res.audio.audio_base64);
+          localStorage.setItem("qdoc_welcome_v4_b64_" + (res.language || targetLang), res.audio.audio_base64);
         } catch (_) {}
       }
     } catch (err: any) {
@@ -777,34 +777,10 @@ export const App: React.FC = () => {
 
       {/* ── TOP BAR (ultra-minimal) ── */}
       <header className="workspace-header relative z-20 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 border-b border-[#1f1f1f] bg-[#0a0a0a]/90 backdrop-blur-md">
-        {/* Brand + Return to Landing */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleReturnHome}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md font-sans text-xs font-semibold text-[#888888] hover:text-[#eaeaea] bg-[#111111] border border-[#1f1f1f] hover:border-[#333333] transition"
-            title="Return to Q-Doc Visiting Page"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Home</span>
-          </button>
-
-          <div
-            className="workspace-brand flex items-center gap-2.5 cursor-pointer"
-            onClick={handleReturnHome}
-          >
-            <svg className="w-7 h-7 shrink-0" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="17" cy="17" r="15.5" stroke="#4361ee" strokeWidth="2" />
-              <rect x="15.25" y="8.5" width="3.5" height="17" rx="1.75" fill="#f72585" />
-              <rect x="8.5" y="15.25" width="17" height="3.5" rx="1.75" fill="#f72585" />
-            </svg>
-            <span className="font-head text-base font-bold tracking-tight text-[#eaeaea]">
-              Q-Doc
-            </span>
-          </div>
-        </div>
-
-        {/* Mode toggle + nav */}
-        <div className="flex items-center gap-2">
+        <button type="button" className="venture-brand workspace-wordmark" onClick={handleReturnHome} aria-label="Q-Doc home">
+          <QDocWordmark />
+        </button>
+        <div className="workspace-actions">
           {/* Autonomy switch */}
           <div className="mode-switch flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 font-mono text-[10px]">
             <button
@@ -830,7 +806,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Multilingual auto-switch indicator / toggle */}
-          <button
+          {view !== "clinician" && <button
             onClick={() => {
               const next = sessionLang.startsWith("hi") ? "en-IN" : "hi-IN";
               setSessionLang(next);
@@ -840,11 +816,10 @@ export const App: React.FC = () => {
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 font-mono text-[10px] text-white/70 hover:text-white transition"
             title="Auto-switches language when you speak Hindi or English. Tap to switch."
           >
-            <span className="text-[11px]">🇮🇳</span>
             <span className="font-semibold tracking-wide">
               {sessionLang.startsWith("hi") ? "हिंदी (Auto)" : "EN (Auto)"}
             </span>
-          </button>
+          </button>}
 
           {/* Clinician Portal */}
           <button
@@ -861,7 +836,8 @@ export const App: React.FC = () => {
                 ? "bg-electric/20 text-electric-light"
                 : "bg-white/5 text-white/50 hover:text-white/80"
             }`}
-            title="Doctor Portal"
+            aria-label={view === "clinician" ? "Back to consultation" : "Clinician review"}
+            title={view === "clinician" ? "Back to consultation" : "Clinician review"}
           >
             <ClipboardList className="w-4 h-4" />
           </button>
@@ -870,7 +846,8 @@ export const App: React.FC = () => {
           <button
             onClick={() => handleNewSession(undefined, true)}
             className="p-2 rounded-full bg-white/5 text-white/50 hover:text-white/80 transition"
-            title="New Session"
+            aria-label="Start a new session"
+            title="Start a new session"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -901,7 +878,7 @@ export const App: React.FC = () => {
       </AnimatePresence>
 
       {/* ── MAIN CONTENT ── */}
-      <main className={`relative z-10 flex-1 flex flex-col items-center ${view === "clinician" ? "justify-start w-full min-h-0 overflow-y-auto py-4" : "justify-center overflow-y-auto py-4 w-full min-h-0"} px-4`}>
+      <main className={`relative z-10 flex-1 flex flex-col items-center ${view === "clinician" ? "justify-start w-full min-h-0 overflow-y-auto py-4" : "justify-start overflow-y-auto py-4 w-full min-h-0"} px-4`}>
         <AnimatePresence mode="wait">
           {/* ════════════════════════════════════════════ */}
           {/*  VOICE VIEW — Ambient AI Core               */}
@@ -915,20 +892,17 @@ export const App: React.FC = () => {
               className="consultation-stage"
             >
               <div className="consultation-heading">
-                <span className="studio-eyebrow"><span /> YOUR PERSONAL SKIN SCREENING SPACE</span>
-                <h1>Your skin. <em>Let’s understand it.</em></h1>
-                <p>A conversation, a little context, and a clearer next step.</p>
+                <span className="studio-eyebrow"><span /> Q-DOC DEMO</span>
+                <h1>Skin screening</h1>
+                <p>Tell Q-Doc about a skin concern by voice or text.</p>
                 <ConsultationProgress stage={slots.consultation_stage} hasPhoto={Boolean(uploadedPhotoId)} hasResult={Boolean(verdictData)} />
               </div>
               {/* AGENT TRANSCRIPT (floating below orb) */}
               <section className="consultation-main">
               <div className="conversation-panel">
-                <div className="conversation-panel-heading"><span className="studio-eyebrow">LIVE CONVERSATION</span><span className="conversation-tag">Voice + text</span></div>
+                <div className="conversation-panel-heading"><span className="studio-eyebrow">CONVERSATION</span><span className="conversation-tag">Voice + text</span></div>
                 <div className="voice-presence">
               <div className="orb-stage">
-                <div className="orb-orbit orbit-one" aria-hidden="true" />
-                <div className="orb-orbit orbit-two" aria-hidden="true" />
-              {/* THE ORB */}
               <AICoreVisualizer
                 phase={agentPhase}
                 audioLevel={voice.audioLevel}
@@ -1086,14 +1060,15 @@ export const App: React.FC = () => {
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="w-full max-w-md flex flex-col gap-4"
+              className="camera-workbench w-full max-w-xl flex flex-col gap-4"
             >
               <button
                 onClick={() => setView("voice")}
-                className="self-start font-mono text-[11px] text-white/50 hover:text-white/80 flex items-center gap-1 transition"
+                className="workspace-back"
               >
-                ← Back to Voice
+                <ArrowLeft size={16} /> Back to consultation
               </button>
+              <h1 className="workbench-title">Add a photo</h1>
               <CameraCapture
                 onCapture={handlePhotoCapture}
                 qualityPassed={verdictData?.image_prediction?.quality_passed}
@@ -1115,34 +1090,40 @@ export const App: React.FC = () => {
             >
               <button
                 onClick={() => setView("voice")}
-                className="self-start font-mono text-[11px] text-white/50 hover:text-white/80 flex items-center gap-1 transition"
+                className="workspace-back"
               >
-                ← Back to Voice
+                <ArrowLeft size={16} /> Back to consultation
               </button>
 
+              <div className="clinician-character-header">
+                <DoctorPortrait />
+                <h1 className="workbench-title">Clinician review</h1>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                 {/* Queue */}
                 <div className="md:col-span-4 glass-panel rounded-2xl p-4 border border-white/10 flex flex-col gap-3 max-h-[700px] overflow-y-auto">
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
                     <span className="font-mono text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      QUEUE
+                      CASE QUEUE
                     </span>
                     <span className="font-mono text-[10px] text-electric-light bg-electric/15 px-2 py-0.5 rounded border border-electric/30">
                       {briefs.length}
                     </span>
                   </div>
                   {briefs.length === 0 ? (
-                    <p className="text-xs text-white/30 font-mono text-center py-8">
+                    <p className="text-sm text-slate-300 py-8">
                       No cases yet.
                     </p>
                   ) : (
                     briefs.map((b) => {
                       const t = b.brief_data?.triage_verdict || ({} as any);
                       return (
-                        <div
+                        <button
+                          type="button"
+                          aria-pressed={selectedBrief?.id === b.id}
                           key={b.id}
                           onClick={() => setSelectedBrief(b)}
-                          className={`p-3 rounded-xl border cursor-pointer transition ${
+                          className={`case-choice p-3 border text-left transition ${
                             selectedBrief?.id === b.id
                               ? "glass-panel-glow border-electric"
                               : "bg-white/5 border-white/10 hover:border-white/20"
@@ -1165,7 +1146,7 @@ export const App: React.FC = () => {
                           <h4 className="text-xs font-bold text-white capitalize mt-1 font-mono">
                             {String(t.top_diagnosis || "Pending").replace("_", " ")}
                           </h4>
-                        </div>
+                        </button>
                       );
                     })
                   )}
