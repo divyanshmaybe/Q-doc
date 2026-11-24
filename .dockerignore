@@ -1,0 +1,12 @@
+.git
+.env*
+**/.env*
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/*.db
+**/*.db-*
+**/*.sqlite*
+**/uploads
+cloudflared.exe
+*.log
