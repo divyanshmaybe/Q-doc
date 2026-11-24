@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: q-doc-api
+    runtime: python
+    plan: free
+    buildCommand: python -m pip install -r requirements-render.txt
+    startCommand: python -m uvicorn services.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.12"
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

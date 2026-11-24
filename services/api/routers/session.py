@@ -35,7 +35,7 @@ def _get_cached_welcome_audio(text: str, language_code: str) -> Dict[str, Any]:
         return _WELCOME_AUDIO_CACHE[lang_key]
 
     # 2. Check disk cache
-    cache_file = os.path.join(_CACHE_DIR, f"welcome_v2_{lang_key.replace('-', '_')}.json")
+    cache_file = os.path.join(_CACHE_DIR, f"welcome_v4_{lang_key.replace('-', '_')}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
@@ -82,20 +82,11 @@ def start_session(req: StartSessionRequest):
     DatabaseRepo.create_session(session_id, language=req.language, mode=mode)
     patient = link_patient(session_id, email) if email else None
 
-    # Initial Welcome with legal informed consent
-    is_hi = "hi" in req.language.lower()
-    if is_hi:
-        welcome_text = (
-            "नमस्ते, मैं क्यू-डॉक हूँ, आपका त्वचा स्क्रीनिंग सहायक। "
-            "कृपया ध्यान दें: यह एक स्क्रीनिंग सहायता है, डॉक्टर नहीं। "
-            "बताइए, आपकी त्वचा में क्या परेशानी हो रही है और आपको सबसे ज्यादा किस बात की चिंता है?"
-        )
-    else:
-        welcome_text = (
-            "Hello, I am Q-Doc, your skin screening assistant. "
-            "Please note: I am a screening aid, not a doctor. "
-            "Tell me what has been happening with your skin, and what is worrying you most."
-        )
+    welcome_text = (
+        "नमस्ते, मैं क्यू-डॉक हूँ। मैं आपकी त्वचा से जुड़ी परेशानी समझने में मदद कर सकता हूँ। मैं शुरुआती जाँच में मदद करता हूँ, और डॉक्टर इसकी पुष्टि कर सकते हैं। आपने क्या बदलाव देखा है?"
+        if "hi" in req.language.lower()
+        else "Hello, I’m Q-Doc. I’m here to help you with any skin concerns you’re having. What skin issue are you facing and where on the body?"
+    )
 
     # Log turn 0
     initial_slots = ClinicalIntakeSlots(primary_language=req.language, age=req.age, sex=req.sex)
