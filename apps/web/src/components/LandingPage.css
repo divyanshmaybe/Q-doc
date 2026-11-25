@@ -923,3 +923,14 @@
 
 .venture-hero #landing-title { font-size:clamp(2.75rem,5.2vw,5.5rem); letter-spacing:-.055em; }
 .venture-hero #landing-title > span { letter-spacing:inherit; }
+
+.founder-photo {
+  width:clamp(84px,9vw,112px);
+  height:auto;
+  aspect-ratio:7/8;
+  object-fit:cover;
+  object-position:center top;
+  flex:none;
+  border:1px solid #8193ff;
+  box-shadow:4px 4px 0 #222f75;
+}
