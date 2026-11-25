@@ -37,6 +37,22 @@ def test_unclear_spoken_age_requires_confirmation():
     assert slots.age == 20 and slots.age_awaiting_confirmation is None
 
 
+def test_age_in_years_does_not_overwrite_symptom_duration():
+    class AgeAndDurationGuess:
+        def generate_json(self, *args):
+            return {"age": 20, "duration_days": 7300}
+
+    for adapter in (OfflineLLM(), AgeAndDurationGuess()):
+        dm = DialogueManager(llm_adapter=adapter)
+        slots = ClinicalIntakeSlots(primary_language="hi-IN", duration_days=3, last_question_field="age")
+        slots, *_ = dm.process_turn(slots, "खुजली मुझे ही हो रही है और मेरी उम्र 20 साल है।")
+        assert slots.duration_days == 3
+
+        slots.last_question_field = "age"
+        slots, *_ = dm.process_turn(slots, "मेरी उम्र 20 साल है और खुजली 4 दिन से है।")
+        assert slots.duration_days == 4
+
+
 def test_all_extracted_fact_types_persist_and_can_be_corrected():
     from services.dialogue.schemas import IntakeFacts
     from services.gateway.llm import IntakeReply
@@ -141,6 +157,20 @@ def test_summary_requires_explicit_confirmation():
     assert slots.is_final_verdict_ready
 
 
+def test_optional_topics_do_not_delay_recap_after_essential_history():
+    planner = ConsultationPlanner(OfflineLLM())
+    slots = complete_slots(has_itching=True, patient_concern=None, daily_impact=None,
+                           pending_clarifications=["nocturnal_itch"])
+    slots, recap, *_ = planner.step(
+        slots, {"next_field": "daily_impact", "next_question": "Does it affect your sleep?"}, [], "en"
+    )
+    assert slots.consultation_stage == "summary"
+    assert not slots.missing_required_slots
+    assert "None" not in recap and "main concern" not in recap
+    slots, *_ = planner.step(slots, {"raw_transcript": "yes"}, [], "en")
+    assert slots.is_final_verdict_ready
+
+
 def test_condition_question_answer_is_preserved_before_summary():
     planner = ConsultationPlanner(OfflineLLM())
     slots = complete_slots(primary_suspected_condition="urticaria")
@@ -192,3 +222,18 @@ def test_followup_does_not_restart_intake():
     assert slots.consultation_stage == "follow_up"
     assert "public clinic" in msg
     assert slots.treatment_barriers == "I cannot afford it"
+
+def test_live_intake_requires_current_turn_evidence(monkeypatch):
+    from services.gateway.llm import LLMAdapter
+    from services.dialogue.clinical_agent import UtteranceNormalizer
+
+    adapter = LLMAdapter(api_key="test")
+    reply = {"age": 20, "duration_days": 7300, "has_fever": True,
+             "fact_evidence": {"age": "20 years", "duration_days": "20 years", "has_fever": "fever"}}
+    monkeypatch.setattr(adapter, "generate_json", lambda *_: reply.copy())
+    result = UtteranceNormalizer(adapter).normalize("I'm 20 years old")
+    assert result["age"] == 20
+    assert "duration_days" not in result and "has_fever" not in result
+    reply.update(duration_days=3, fact_evidence={"age": "20 years", "duration_days": "three days"})
+    result = UtteranceNormalizer(adapter).normalize("I'm 20 years old and it started three days ago")
+    assert result["duration_days"] == 3

@@ -145,8 +145,10 @@ class PolicyEvaluator:
 
         # 3. Confidence & Margin Checks (Abstention)
         margin = 0.0
-        if len(reasoning.differential) >= 2:
-            margin = reasoning.differential[0].probability - reasoning.differential[1].probability
+        alternatives = [item.probability for item in reasoning.differential
+                        if item.condition != reasoning.top_diagnosis]
+        if alternatives:
+            margin = reasoning.final_confidence - max(alternatives)
 
         low_confidence = reasoning.final_confidence < self.cfg["thresholds"]["top1_confidence_min"]
         low_margin = margin < self.cfg["thresholds"]["top1_top2_margin_min"]

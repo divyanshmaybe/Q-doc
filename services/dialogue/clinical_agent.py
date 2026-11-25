@@ -2,7 +2,7 @@
 
 import json
 from typing import Dict, Any, List, Optional, Tuple
-from services.dialogue.schemas import ClinicalIntakeSlots
+from services.dialogue.schemas import ClinicalIntakeSlots, IntakeFacts
 from services.gateway.llm import LLMAdapter
 
 
@@ -27,7 +27,12 @@ class UtteranceNormalizer:
             "Your task is to deeply understand the patient's conversational transcript in the context of the previous doctor/assistant question. "
             "Never invent facts not stated by the patient. Accurately interpret natural conversational phrasing, negations, temporal units, and anatomical locations.\n\n"
             "Extract only explicitly supported facts using the supplied response schema. "
+            "For each populated fact include its shortest supporting verbatim quote from this turn in fact_evidence. "
+            "Use the prior question to resolve short answers. Do not extract facts about relatives as patient symptoms. "
+            "For duration_days quote the symptom timeline separately from demographic or medication history. "
             "Use null or omit unmentioned facts. Convert duration to days and age to years. "
+            "An age is never a symptom duration. If the patient gives both, extract each from its "
+            "own phrase and leave duration null when the reply only provides age. "
             "Set safety_screen_complete only for an explicit answer to the safety screen. "
             "Record true when all screened dangers are denied, false for a reported danger. "
             "For ambiguous_fields include the exact supporting quote in ambiguity_evidence. "
@@ -44,6 +49,9 @@ class UtteranceNormalizer:
             "question when that helps the patient know they were understood. "
             "Also return next_field and next_question. Use the recent dialogue and known facts. "
             "Choose an unanswered topic from reference_questions that naturally follows the latest reply. "
+            "Prefer the essential history: location, onset, fever, safety, itching, pain, spread and prior treatment. "
+            "Ask about the patient's concern, daily impact, nighttime itching, contacts or triggers only "
+            "if the answer could change the assessment or next step. "
             "Account for facts supplied or corrected in this turn. Ask one short question in the patient's "
             "language, grounded in their words, without diagnosis, advice or assumptions. "
             "If the patient is just greeting you or asking to begin without describing a problem, "
@@ -58,6 +66,20 @@ class UtteranceNormalizer:
             res = self.llm.generate_json(system_prompt, user_prompt)
             if isinstance(res, dict) and res.get("status") != "fallback":
                 res["model_planned"] = isinstance(self.llm, LLMAdapter)
+                if res["model_planned"]:
+                    quotes = res.get("fact_evidence", {})
+                    for field in IntakeFacts.model_fields:
+                        if res.get(field) is None:
+                            continue
+                        quote = quotes.get(field, "").strip().casefold()
+                        if not quote or quote not in raw_transcript.casefold():
+                            res.pop(field)
+                            if not any(res.get(k) is not None for k in IntakeFacts.model_fields):
+                                res["needs_reconfirmation"] = True
+                    age_quote = quotes.get("age", "").strip().casefold()
+                    duration_quote = quotes.get("duration_days", "").strip().casefold()
+                    if age_quote and duration_quote and duration_quote in age_quote:
+                        res.pop("duration_days", None)
                 # Model uncertainty must be grounded in the current utterance.
                 # Absent fields are normal in a multi-turn conversation.
                 evidence = res.get("ambiguity_evidence", {})

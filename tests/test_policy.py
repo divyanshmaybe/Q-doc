@@ -108,3 +108,16 @@ def test_sanitize_dosages_and_prescriptions():
     assert "500mg" not in sanitized
     assert "prednisone" not in sanitized
     assert "twice daily" not in sanitized
+
+@pytest.mark.parametrize("runner_up, expect_abstain", [(0.10, False), (0.85, True)])
+def test_differential_can_omit_primary_diagnosis(runner_up, expect_abstain):
+    reasoning = ClinicalReasonerOutput(
+        top_diagnosis="tinea", final_confidence=0.88,
+        differential=[
+            DifferentialDiagnosisItem(condition="pityriasis_rosea", probability=runner_up, clinical_justification="Alternative"),
+            DifferentialDiagnosisItem(condition="eczema", probability=0.02, clinical_justification="Alternative"),
+        ],
+        identified_red_flags=[], synthesized_explanation="Provisional screening",
+    )
+    decision = PolicyEvaluator().evaluate(ClinicalIntakeSlots(), None, reasoning)
+    assert decision.abstain is expect_abstain

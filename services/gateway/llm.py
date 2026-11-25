@@ -18,7 +18,7 @@ from services.dialogue.schemas import IntakeFacts
 retry_notice: ContextVar[Optional[Callable[[int], None]]] = ContextVar("gemini_retry_notice", default=None)
 
 
-def post_intake(url, headers, payload):
+def post_gemini(url, headers, payload):
     for attempt in range(4):
         delay = 2 ** attempt
         try:
@@ -41,6 +41,7 @@ def post_intake(url, headers, payload):
 
 
 class IntakeReply(IntakeFacts):
+    fact_evidence: dict[str, str] = Field(default_factory=dict)
     next_field: Optional[str] = None
     next_question: Optional[str] = None
     declined_current_question: bool = False
@@ -75,7 +76,7 @@ class LLMAdapter(BaseLLMAdapter):
                     "temperature": 0.1
                 }
             }
-            resp = post_intake(url, {"x-goog-api-key": self.gemini_key}, payload)
+            resp = post_gemini(url, {"x-goog-api-key": self.gemini_key}, payload)
             if resp.status_code == 200:
                 data = resp.json()
                 raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()

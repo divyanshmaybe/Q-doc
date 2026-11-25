@@ -11,6 +11,8 @@ import io
 import json
 import base64
 import requests
+from services.gateway.llm import post_gemini
+from services.gateway.errors import ProviderError
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from PIL import Image
@@ -43,7 +45,7 @@ class MultimodalDermatologistAgent:
         raw_key = api_key or os.getenv("GEMINI_API_KEY", "")
         self.gemini_key = raw_key.strip("'\" \t\r\n") if raw_key else ""
         self.search_tool = MedicalWebSearchTool()
-        self.model_name = "gemini-3.1-flash-lite"
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     def inspect_early_photo(
         self,
@@ -112,7 +114,7 @@ Examine the skin photo and return JSON ONLY with this schema:
   "initial_confidence": 0.5 to 0.95
 }}"""
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
                 payload = {
                     "contents": [{
                         "parts": [
@@ -126,7 +128,7 @@ Examine the skin photo and return JSON ONLY with this schema:
                     }
                 }
 
-                resp = requests.post(url, json=payload, timeout=16)
+                resp = post_gemini(url, {"x-goog-api-key": self.gemini_key}, payload)
                 if resp.status_code == 200:
                     data = resp.json()
                     raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -140,8 +142,13 @@ Examine the skin photo and return JSON ONLY with this schema:
                         "initial_confidence": float(parsed.get("initial_confidence", 0.0)),
                         "vision_available": True
                     }
-            except Exception as e:
-                print(f"[MultimodalDermatologistAgent] Early photo inspection API error: {e}")
+                raise ProviderError(f"Gemini photo analysis failed (HTTP {resp.status_code}).")
+            except requests.Timeout as exc:
+                raise ProviderError("Gemini photo analysis timed out after retries.") from exc
+            except requests.RequestException as exc:
+                raise ProviderError("The connection to Gemini photo analysis failed.") from exc
+            except (ValueError, KeyError, TypeError, IndexError, AttributeError) as exc:
+                raise ProviderError("Gemini returned an unusable photo analysis.") from exc
 
         # No image inference was completed. Continue collecting history without
         # inventing morphology or anchoring on a site-based disease label.
@@ -285,7 +292,7 @@ Examine the attached skin photograph and return JSON ONLY with this schema:
   "identified_red_flags": []
 }}"""
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.gemini_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
         payload = {
             "contents": [{
                 "parts": [
@@ -299,9 +306,9 @@ Examine the attached skin photograph and return JSON ONLY with this schema:
             }
         }
 
-        resp = requests.post(url, json=payload, timeout=16)
+        resp = post_gemini(url, {"x-goog-api-key": self.gemini_key}, payload)
         if resp.status_code != 200:
-            raise RuntimeError(f"Gemini API returned status {resp.status_code}: {resp.text}")
+            raise ProviderError(f"Gemini assessment failed (HTTP {resp.status_code}).")
 
         data = resp.json()
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()

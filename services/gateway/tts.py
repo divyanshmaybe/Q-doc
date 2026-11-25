@@ -4,6 +4,7 @@ Sarvam speech synthesis with multi-chunk WAV output.
 
 import os
 import re
+import time
 import wave
 import io
 import base64
@@ -94,19 +95,15 @@ class SarvamTTSAdapter(BaseTTSAdapter):
         }
 
         speaker = (os.getenv("SARVAM_SPEAKER") or "rohan").strip("'\" \t\r\n")
-        chunks = chunk_text_for_tts(text, max_chars=400)
-
-        # Sarvam allows up to 3 chunks per POST request
-        batch_size = 3
-        batches = [chunks[i:i+batch_size] for i in range(0, len(chunks), batch_size)]
+        chunks = chunk_text_for_tts(text, max_chars=2500)
 
         all_audios: List[str] = []
 
         try:
-            for b in batches:
+            for chunk in chunks:
                 payload = {
-                    "inputs": b,
-                    "target_language_code": language_code,
+                    "text": chunk,
+                    "language_code": language_code,
                     "speaker": speaker,
                     "pitch": 0,
                     "pace": 1.0,
@@ -115,15 +112,17 @@ class SarvamTTSAdapter(BaseTTSAdapter):
                     "enable_preprocessing": True,
                     "model": "bulbul:v3"
                 }
-                resp = requests.post(SARVAM_TTS_URL, headers=headers, json=payload, timeout=20.0)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    audios = data.get("audios", [])
-                    if len(audios) != len(b) or not all(audios):
-                        raise ProviderError("Sarvam speech synthesis failed: incomplete audio.")
-                    all_audios.extend(audios)
-                else:
-                    raise ProviderError(f"Sarvam speech synthesis failed (HTTP {resp.status_code}).")
+                for attempt in range(4):
+                    resp = requests.post(SARVAM_TTS_URL, headers=headers, json=payload, timeout=(5, 90))
+                    if resp.status_code != 200:
+                        raise ProviderError(f"Sarvam speech synthesis failed (HTTP {resp.status_code}).")
+                    audios = resp.json().get("audios")
+                    if isinstance(audios, list) and audios and all(isinstance(a, str) and a.strip() for a in audios):
+                        all_audios.extend(audios)
+                        break
+                    if attempt == 3:
+                        raise ProviderError("Sarvam speech synthesis failed: incomplete audio after 4 attempts.")
+                    time.sleep(2 ** attempt)
             combined = concatenate_wav_audios(all_audios)
             if not combined:
                 raise ProviderError("Sarvam speech synthesis failed: empty audio.")

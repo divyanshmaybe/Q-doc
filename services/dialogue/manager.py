@@ -195,12 +195,22 @@ class DialogueManager:
         # Only use offline rule extraction for slots where LLM returned None
         fresh = ClinicalIntakeSlots(primary_language=current_slots.primary_language)
         self._extract_slots(user_utterance, fresh, lang, question_field)
-        for field in ("body_site", "lesion_type", "duration_days", "age", "has_itching",
-                      "has_fever", "household_contacts_affected", "has_pain", "is_spreading"):
-            if norm_res.get(field) is None:
-                value = getattr(fresh, field)
-                if value is not None:
-                    norm_res[field] = value
+        duration_text = self._without_age(user_utterance.casefold(), question_field)
+        if duration_text != user_utterance.casefold() or question_field == "age":
+            # Preserve the existing timeline unless the age answer also gives an onset.
+            if fresh.duration_days is not None and type(guessed_age) is int and norm_res.get("duration_days") == guessed_age * 365:
+                norm_res["duration_days"] = fresh.duration_days
+            elif fresh.duration_days is None and not re.search(
+                r"\b(?:since|ago|for)\b|से|पहले", duration_text
+            ):
+                norm_res["duration_days"] = None
+        if norm_res.get("status") == "fallback" or norm_res.get("model_planned") is False:
+            for field in ("body_site", "lesion_type", "duration_days", "age", "has_itching",
+                          "has_fever", "household_contacts_affected", "has_pain", "is_spreading"):
+                if norm_res.get(field) is None:
+                    value = getattr(fresh, field)
+                    if value is not None:
+                        norm_res[field] = value
 
         if question_field in ("prior_treatments", "patient_concern", "daily_impact", "treatment_barriers", "triggers") and negative:
             if norm_res.get(question_field) is None:
@@ -331,6 +341,15 @@ class DialogueManager:
         full_msg = f"{ack} {ask}".strip() if ack else ask
         return sanitize_safety_constraints(full_msg)
 
+    @staticmethod
+    def _without_age(text: str, question_field: Optional[str]) -> str:
+        years = r"\d+\s*(?:years?\b|saal\b|साल|वर्ष)"
+        text = re.sub(rf"(?:\bage(?:\s+is)?\s*[:=]?\s*|उम्र\s*(?:है\s*)?){years}", "", text)
+        text = re.sub(rf"{years}\s*(?:old\b|की\s+उम्र|का\s+हूँ|की\s+हूँ)", "", text)
+        if question_field == "age":
+            text = re.sub(rf"^\s*{years}(?!\s*(?:ago\b|से|पहले))", "", text)
+        return text
+
     def _extract_slots(self, utterance: str, slots: ClinicalIntakeSlots, lang: str, last_question_slot: Optional[str] = None) -> None:
         lower = utterance.lower()
 
@@ -423,10 +442,11 @@ class DialogueManager:
 
         # B. Comprehensive Duration in Days
         if slots.duration_days is None:
-            match_years = re.search(r'(\d+)\s*(?:years?|saal|साल)', lower)
-            match_weeks = re.search(r'(\d+)\s*(?:weeks?|हफ्ते|हफ़्ते|सप्ताह|haf?te)', lower)
-            match_days = re.search(r'(\d+)\s*(?:days?|दिन|din)', lower)
-            match_months = re.search(r'(\d+)\s*(?:months?|महीने|माह|mahine)', lower)
+            timeline = self._without_age(lower, last_question_slot)
+            match_years = re.search(r'(\d+)\s*(?:years?|saal|साल)', timeline)
+            match_weeks = re.search(r'(\d+)\s*(?:weeks?|हफ्ते|हफ़्ते|सप्ताह|haf?te)', timeline)
+            match_days = re.search(r'(\d+)\s*(?:days?|दिन|din)', timeline)
+            match_months = re.search(r'(\d+)\s*(?:months?|महीने|माह|mahine)', timeline)
 
             if match_years:
                 slots.duration_days = int(match_years.group(1)) * 365
@@ -436,7 +456,7 @@ class DialogueManager:
                 slots.duration_days = int(match_days.group(1))
             elif match_months:
                 slots.duration_days = int(match_months.group(1)) * 30
-            elif any(w in lower for w in ["a year", "an year", "one year", "1 year", "ek saal", "एक साल"]):
+            elif any(w in timeline for w in ["a year", "an year", "one year", "1 year", "ek saal", "एक साल"]):
                 slots.duration_days = 365
             elif any(w in lower for w in ["two weeks", "दो हफ्ते", "2 weeks", "2 hafte"]):
                 slots.duration_days = 14

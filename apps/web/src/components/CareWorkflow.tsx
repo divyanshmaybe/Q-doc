@@ -46,7 +46,7 @@ export function CareWorkflow({ sessionId, reviewer = false }: { sessionId: strin
         <p className="text-white/50">Reviewed by {care.plan.reviewer_name} · {care.plan.registration_id}</p>
         <button onClick={() => {
           window.speechSynthesis.cancel();
-          const speech = new SpeechSynthesisUtterance(`${care.plan.instructions}. ${care.plan.follow_up}. ${care.plan.return_precautions}`);
+          const speech = new SpeechSynthesisUtterance(`${care.plan.diagnosis}. ${care.plan.instructions}. ${care.plan.follow_up}. ${care.plan.return_precautions}`);
           speech.lang = care.plan.language; window.speechSynthesis.speak(speech);
         }} className="text-electric-light">Listen to the signed plan</button>
       </div>}
@@ -60,10 +60,10 @@ export function CareWorkflow({ sessionId, reviewer = false }: { sessionId: strin
           <button disabled={busy || !key || care.screening?.needs_update} className="text-electric-light" onClick={() => perform(async () => {
             const result = await careRequest(sessionId, "/prepare", {}, key);
             const {reasoning_and_checks, ...draft} = result.draft;
-            setForm(prev => ({ ...prev, ...draft, language: "en-IN" }));
+            setForm(prev => ({ ...prev, ...draft, language: result.language }));
             setChecks(reasoning_and_checks);
             setDraftVersion(result.evidence_version);
-          })}>Generate clinical draft for review</button>
+          })}>Open clinical draft for review</button>
           {checks && <p><strong>Clinical reasoning and checks before signing</strong><br />{checks}</p>}
           {([['reviewer_name', 'Reviewer name'], ['registration_id', 'Registration ID'], ['diagnosis', 'Clinical assessment'], ['instructions', 'Patient instructions'], ['follow_up', 'Follow-up timing and action'], ['return_precautions', 'When to seek help']] as const).map(([name, label]) =>
             <label className="block" key={name}>{label}<textarea className={input} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /></label>)}

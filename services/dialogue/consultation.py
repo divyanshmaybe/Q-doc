@@ -8,6 +8,8 @@ from services.dialogue.schemas import IntakeFacts
 
 FACTS = tuple(IntakeFacts.model_fields)
 INTRO_FIELDS = ("preferred_name", "age", "gender")
+OPTIONAL_FOLLOWUPS = ("patient_concern", "daily_impact", "nocturnal_itch",
+                      "household_contacts_affected", "triggers")
 QUESTIONS = {
     "preferred_name": ("What name would you like me to use?", "मैं आपको किस नाम से बुलाऊँ?"),
     "gender": ("How would you describe your gender? You can skip this question.", "आप अपना जेंडर कैसे बताते हैं? चाहें तो यह सवाल छोड़ सकते हैं।"),
@@ -131,6 +133,8 @@ class ConsultationPlanner:
         if slots.safety_screen_complete is True:
             slots.pending_clarifications = [key for key in slots.pending_clarifications
                                            if key != "safety_screen_complete"]
+        slots.pending_clarifications = [key for key in slots.pending_clarifications
+                                       if key not in OPTIONAL_FOLLOWUPS]
         if any(word in lower for word in ("not achieved", "notes on teaching")):
             if "has_itching" not in slots.pending_clarifications:
                 slots.pending_clarifications.append("has_itching")
@@ -200,11 +204,6 @@ class ConsultationPlanner:
                 "आपका दर्ज अगला कदम है: " + slots.reviewed_plan + " इसे करने में कोई सवाल या परेशानी है?"))
         basics = ["body_site", "duration_days", "has_fever", "safety_screen_complete"]
         required = basics + ["has_itching", "has_pain", "is_spreading", "prior_treatments"]
-        if slots.has_itching:
-            required.extend(["household_contacts_affected", "nocturnal_itch"])
-        if any(term in " ".join(slots.suspected_differentials).lower() for term in ("eczema", "dermatitis", "urticaria")):
-            required.append("triggers")
-        required.extend(["patient_concern", "daily_impact"])
         missing = [field for field in required if getattr(slots, field) is None
                    and slots.fact_status.get(field) != "patient_unsure"]
         slots.missing_required_slots = missing
@@ -248,8 +247,10 @@ class ConsultationPlanner:
                 revised = self.llm.generate_json(
                     "Revise the follow-up. Return next_field from eligible and next_question, one natural "
                     "question in the requested language. Follow the latest answer and stage goal. "
-                    "Do not ask about answered facts or give clinical advice.",
+                    "Prefer missing essentials. Ask about optional topics only if the answer could "
+                    "change the assessment or next step. Do not ask about answered facts or give clinical advice.",
                     json.dumps({"eligible": eligible, "known": {k: getattr(slots, k) for k in FACTS if getattr(slots, k) is not None},
+                                "optional_topics": OPTIONAL_FOLLOWUPS,
                                 "language": lang, "recent_dialogue": [{"speaker": t.get("speaker"), "text": t.get("transcript")} for t in history[-6:]],
                                 "latest_answer": raw, "photo_history": slots.condition_specific_history,
                                 "stage_goal": basic_missing if before_photo else missing}, ensure_ascii=False))
@@ -279,9 +280,14 @@ class ConsultationPlanner:
                 ) + fallback
             return respond("ask_question", "history", fallback, field)
         if not slots.summary_confirmed:
+            concern = slots.patient_concern.strip().rstrip(".।!? ") if slots.patient_concern else ""
             summary = choose(
-                f"Let me check: {slots.lesion_type or 'a skin problem'} on your {slots.body_site}, starting about {slots.duration_days} days ago. Your main concern is: {slots.patient_concern}. Is that correct, or should I change anything?",
-                f"मैं पुष्टि कर लूं: {slots.body_site} पर {slots.lesion_type or 'त्वचा की परेशानी'} लगभग {slots.duration_days} दिन से है। आपकी मुख्य चिंता: {slots.patient_concern}। क्या यह सही है, या कुछ बदलना है?")
+                f"Let me check: {slots.lesion_type or 'a skin problem'} on your {slots.body_site}, starting about {slots.duration_days} days ago."
+                + (f" Your main concern is {concern}." if concern else "")
+                + " Is that correct, or should I change anything?",
+                f"मैं पुष्टि कर लूं: {slots.body_site} पर {slots.lesion_type or 'त्वचा की परेशानी'} लगभग {slots.duration_days} दिन से है।"
+                + (f" आपकी मुख्य चिंता है: {concern}।" if concern else "")
+                + " क्या यह सही है, या कुछ बदलना है?")
             return respond("summarize", "summary", summary)
         if slots.photo_declined:
             slots.handoff_required = True
