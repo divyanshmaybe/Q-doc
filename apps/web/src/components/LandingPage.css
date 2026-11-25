@@ -899,3 +899,27 @@
 
 .character-art { display:block; position:relative; width:100%; aspect-ratio:1; }
 .character-art-1 .story-avatar { transform:scaleX(-1); }
+
+.qdoc-landing .story-sources { display:flex; flex-wrap:wrap; gap:6px 18px; margin:12px 0 0; padding:0; list-style:none; }
+.qdoc-landing .story-sources a { display:inline-flex; align-items:center; min-height:28px; color:#b5c2ff; font-size:.8125rem; text-decoration:underline; text-underline-offset:3px; }
+
+.qdoc-landing .demo-entry {
+  background:#4361ee;
+  color:#fff;
+  border:1px solid #9aaaff;
+  box-shadow:4px 4px 0 #222f75;
+  min-height:44px;
+  padding:9px 18px;
+  font:600 .875rem/1.25 Inter,system-ui,sans-serif;
+  white-space:nowrap;
+}
+.qdoc-landing .demo-entry:hover { background:#3653db; box-shadow:6px 6px 0 #222f75; }
+.qdoc-landing .demo-entry:active { box-shadow:1px 1px 0 #222f75; }
+.demo-entry.pin-kiosk { position:absolute; }
+.demo-terminal > .terminal-demo-entry { display:flex; width:fit-content; margin-inline:auto; }
+@media(max-width:540px) {
+  .qdoc-landing .demo-entry { padding-inline:12px; font-size:.8125rem; }
+}
+
+.venture-hero #landing-title { font-size:clamp(2.75rem,5.2vw,5.5rem); letter-spacing:-.055em; }
+.venture-hero #landing-title > span { letter-spacing:inherit; }
