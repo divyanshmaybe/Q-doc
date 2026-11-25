@@ -29,18 +29,37 @@ class UrgencyLevel(str, Enum):
     SEEK_OPD = "seek_opd"
     EMERGENCY = "emergency"
 
-class ClinicalIntakeSlots(BaseModel):
-    primary_language: str = Field(default="hi-IN", description="Patient primary language code (hi-IN, en-IN)")
-    age: Optional[int] = None
-    sex: Optional[str] = None
+class IntakeFacts(BaseModel):
+    preferred_name: Optional[str] = Field(None, description="Name the patient explicitly gives for this visit")
+    gender: Optional[str] = Field(None, description="Self-described gender; never infer from name, voice or grammar")
+    age: Optional[int] = Field(None, ge=0, le=120)
     body_site: Optional[str] = Field(None, description="Location of lesion")
     lesion_type: Optional[str] = Field(None, description="Reported morphological description (e.g. rough and flaky skin, pimples, dark spot, rash)")
-    duration_days: Optional[int] = Field(None, description="Duration in days")
+    duration_days: Optional[int] = Field(None, ge=0, description="Duration in days")
     has_itching: Optional[bool] = None
     has_pain: Optional[bool] = None
     is_spreading: Optional[bool] = None
     has_fever: Optional[bool] = None
     household_contacts_affected: Optional[bool] = Field(None, description="Important for scabies")
+    patient_concern: Optional[str] = None
+    daily_impact: Optional[str] = None
+    nocturnal_itch: Optional[bool] = Field(None, description="Whether itching becomes worse at night")
+    triggers: Optional[str] = None
+    prior_treatments: Optional[str] = None
+    treatment_barriers: Optional[str] = None
+    safety_screen_complete: Optional[bool] = None
+    breathing_difficulty: Optional[bool] = None
+    mucosal_involvement: Optional[bool] = None
+    is_pregnant: Optional[bool] = None
+
+
+class ClinicalIntakeSlots(IntakeFacts):
+    introduction_pending: bool = False
+    age_awaiting_confirmation: Optional[int] = None
+    # Preserve verbatim night-itch answers in older saved sessions.
+    nocturnal_itch: Union[bool, str, None] = None
+    primary_language: str = Field(default="hi-IN", description="Patient primary language code (hi-IN, en-IN)")
+    sex: Optional[str] = None
     known_allergies: Optional[List[str]] = Field(default_factory=list)
     current_medications: Optional[List[str]] = Field(default_factory=list)
     
@@ -63,16 +82,6 @@ class ClinicalIntakeSlots(BaseModel):
     last_question_field: Optional[str] = None
     summary_confirmed: bool = False
     photo_declined: bool = False
-    patient_concern: Optional[str] = None
-    daily_impact: Optional[str] = None
-    nocturnal_itch: Optional[str] = None
-    triggers: Optional[str] = None
-    prior_treatments: Optional[str] = None
-    treatment_barriers: Optional[str] = None
-    safety_screen_complete: Optional[bool] = None
-    breathing_difficulty: Optional[bool] = None
-    mucosal_involvement: Optional[bool] = None
-    is_pregnant: Optional[bool] = None
     handoff_required: bool = False
     handoff_urgency: Optional[str] = None
     reviewed_plan: Optional[str] = None

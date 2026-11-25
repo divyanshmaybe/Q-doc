@@ -8,7 +8,8 @@ Fully supports both /api/v1/... and /api/... endpoints for compatibility.
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from services.gateway.errors import ProviderError
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import os
@@ -33,6 +34,10 @@ app = FastAPI(
     description="Voice-first and photo-based skin screening agent with controllable autonomy",
     version="1.0.0"
 )
+
+@app.exception_handler(ProviderError)
+async def provider_error(request, exc):
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
 
 # CORS
 app.add_middleware(

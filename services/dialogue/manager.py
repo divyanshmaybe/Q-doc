@@ -107,6 +107,8 @@ class DialogueManager:
         lang = "hi" if "hi" in current_slots.primary_language.lower() else "en"
 
         history = turn_history if turn_history is not None else current_slots.conversation_history
+        history = [{"speaker": t.get("speaker", t.get("role", "patient")),
+                    "transcript": t.get("transcript", t.get("text", ""))} for t in history]
         context = next((t.get("transcript", t.get("text", "")) for t in reversed(history)
                         if t.get("speaker", t.get("role")) in ("agent", "assistant")), None)
         question_field = current_slots.last_question_field or last_question_slot
@@ -121,15 +123,53 @@ class DialogueManager:
 
         answer = user_utterance.casefold().strip(" .!,?।")
         affirmative = answer in ("yes", "yeah", "yep", "haan", "हाँ", "हां")
-        negative = answer in ("no", "nope", "nahi", "nahin", "नहीं", "none", "none of these", "no to all")
+        negative = answer in ("no", "nope", "nahi", "nahin", "नहीं", "none", "none of these", "no to all",
+                              "नहीं, इनमें से नहीं है कुछ", "इनमें से कोई नहीं")
         direct_fields = ("has_fever", "has_itching", "has_pain", "is_spreading",
-                         "household_contacts_affected", "safety_screen_complete")
+                         "household_contacts_affected", "nocturnal_itch", "breathing_difficulty",
+                         "mucosal_involvement", "is_pregnant", "safety_screen_complete")
 
         # LLM-First Understanding: Always invoke the LLM to understand conversational nuance
-        norm_res = self.normalizer.normalize(user_utterance, context or question_field, lang)
+        from .consultation import FACTS, QUESTIONS, intake_red_flags
+        greeting = re.fullmatch(r"(?:hi|hello|hey|good morning|good evening|namaste|नमस्ते|हेलो)(?:\s+(?:there|doctor|doc|q-doc|डॉक्टर))?", answer)
+        bare_number = re.fullmatch(r"\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|पाँच|पांच", answer)
+        unclear_number = bare_number and question_field != "age" and current_slots.consultation_stage == "history"
+        confirming_age = question_field == "age" and current_slots.age_awaiting_confirmation is not None
+        if confirming_age and (affirmative or negative):
+            norm_res = ({"age": current_slots.age_awaiting_confirmation} if affirmative
+                        else {"ambiguous_fields": ["age"]})
+            current_slots.age_awaiting_confirmation = None
+        elif unclear_number:
+            norm_res = {"needs_reconfirmation": True}
+        elif greeting:
+            norm_res = {"social_opening": True}
+        else:
+            norm_res = self.normalizer.normalize(user_utterance, context or question_field, lang, {
+                "recent_dialogue": [{"speaker": t.get("speaker", t.get("role")),
+                                     "text": t.get("transcript", t.get("text"))} for t in history[-8:]],
+                "known_facts": {k: getattr(current_slots, k) for k in FACTS if getattr(current_slots, k) is not None},
+                "stage_goal": ("Use the photo observations to explore unresolved history" if current_slots.photo_image_id
+                               else "Continue the interview by voice" if current_slots.photo_declined
+                               else "Understand the concern and establish location, onset, fever and safety for an optional photo"),
+                "photo_history": current_slots.condition_specific_history,
+                "reference_questions": {k: q[lang == "hi"] for k, q in QUESTIONS.items()
+                                        if getattr(current_slots, k) is None and current_slots.fact_status.get(k) != "patient_unsure"},
+            })
+        if (norm_res.get("social_opening") is True and not current_slots.handoff_required
+                and not intake_red_flags(current_slots) and not any(norm_res.get(k) is not None for k in FACTS)
+                and current_slots.consultation_stage == "history"):
+            invitation = ("नमस्ते! बताइए, आपको क्या परेशानी हो रही है?" if lang == "hi"
+                          else "Hi! What’s been bothering you?")
+            if current_slots.introduction_pending and question_field in QUESTIONS:
+                invitation = ("नमस्ते! " if lang == "hi" else "Hi! ") + QUESTIONS[question_field][lang == "hi"]
+            else:
+                current_slots.last_question_field = None
+            current_slots.conversation_history = [*history, {"speaker": "patient", "transcript": user_utterance},
+                                                 {"speaker": "agent", "transcript": invitation}]
+            return current_slots, invitation, False, None
 
         # Fallback to direct simple mapping only if LLM is offline or returns fallback
-        if norm_res.get("status") == "fallback":
+        if affirmative or negative:
             if question_field in direct_fields and (affirmative or negative):
                 if question_field == "safety_screen_complete":
                     if negative:
@@ -139,6 +179,18 @@ class DialogueManager:
 
         norm_res["raw_transcript"] = user_utterance
         norm_res["clean_meaning"] = user_utterance
+        guessed_age = norm_res.get("age")
+        if (question_field == "age" and type(guessed_age) is int and 0 <= guessed_age <= 120
+                and not (confirming_age and affirmative) and not re.search(r"\d", answer)):
+            current_slots.age_awaiting_confirmation = guessed_age
+            norm_res["age"] = None
+            norm_res["ambiguous_fields"] = [*norm_res.get("ambiguous_fields", []), "age"]
+        if answer in ("it itches", "it is itchy", "it's itchy"):
+            norm_res["has_pain"] = None
+            if current_slots.body_site:
+                norm_res["ambiguous_fields"] = [f for f in norm_res.get("ambiguous_fields", []) if f != "body_site"]
+                if "body_site" in current_slots.pending_clarifications:
+                    current_slots.pending_clarifications.remove("body_site")
 
         # Only use offline rule extraction for slots where LLM returned None
         fresh = ClinicalIntakeSlots(primary_language=current_slots.primary_language)
@@ -150,7 +202,7 @@ class DialogueManager:
                 if value is not None:
                     norm_res[field] = value
 
-        if question_field in ("prior_treatments", "patient_concern", "daily_impact", "treatment_barriers", "nocturnal_itch", "triggers"):
+        if question_field in ("prior_treatments", "patient_concern", "daily_impact", "treatment_barriers", "triggers") and negative:
             if norm_res.get(question_field) is None:
                 norm_res[question_field] = user_utterance
         # Explicit safety phrases are handled even when the language service is unavailable.
@@ -164,6 +216,21 @@ class DialogueManager:
             if any(any(term in clause for term in positives) and not any(term in clause for term in negatives)
                    for clause in clauses):
                 norm_res[field] = True
+        offline_unknown = (norm_res.get("status") == "fallback" and not any(norm_res.get(k) is not None for k in FACTS)
+                           and not current_slots.photo_declined and not current_slots.photo_image_id
+                           and not any(w in lower for w in ("photo", "फोटो", "not achieved", "notes on teaching")))
+        if ((norm_res.get("needs_reconfirmation") is True or offline_unknown)
+                and current_slots.consultation_stage == "history" and not current_slots.handoff_required
+                and not intake_red_flags(current_slots)
+                and not any(norm_res.get(k) is True for k in ("breathing_difficulty", "mucosal_involvement", "has_fever", "is_pregnant"))
+                and norm_res.get("age") is None):
+            heard = user_utterance.strip()[:120]
+            agent_msg = (f'मैंने सुना “{heard}”। आपका क्या मतलब था?'
+                         if lang == "hi" else f'I heard “{heard}”. What did you mean by that?')
+            current_slots.planned_action = "clarify"
+            current_slots.conversation_history = [*history, {"speaker": "patient", "transcript": user_utterance},
+                                                 {"speaker": "agent", "transcript": agent_msg}]
+            return current_slots, agent_msg, False, None
         slots, agent_msg, is_ready, confirm_prompt = self.head_agent.step(
             slots=current_slots, normalized_intent=norm_res, turn_history=history, lang=lang
         )

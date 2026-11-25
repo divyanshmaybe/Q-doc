@@ -11,4 +11,9 @@ def restore_intake(turns, language):
             # Null is meaningful: a later snapshot can clear earlier state.
             values.update({key: value for key, value in snapshot.items() if key in fields})
     values["primary_language"] = language
+    if "conversation_history" in values:
+        values["conversation_history"] = [
+            {"speaker": t["speaker"], "transcript": t["transcript"]}
+            for t in values["conversation_history"] if isinstance(t, dict) and "speaker" in t and "transcript" in t
+        ]
     return ClinicalIntakeSlots.model_validate(values)

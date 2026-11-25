@@ -1,6 +1,5 @@
 """
-Sarvam AI TTS Adapter with Seamless Multi-Chunk Concatenation
-and Browser SpeechSynthesis Fallback.
+Sarvam speech synthesis with multi-chunk WAV output.
 """
 
 import os
@@ -10,6 +9,7 @@ import io
 import base64
 import requests
 from typing import Dict, Any, Optional, List
+from .errors import ProviderError
 from .base import BaseTTSAdapter
 
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
@@ -44,8 +44,6 @@ def concatenate_wav_audios(base64_list: List[str]) -> Optional[str]:
     """Seamlessly joins multiple base64-encoded WAV chunks into a single continuous WAV."""
     if not base64_list:
         return None
-    if len(base64_list) == 1:
-        return base64_list[0]
 
     try:
         in_buffers = [io.BytesIO(base64.b64decode(b)) for b in base64_list]
@@ -55,6 +53,10 @@ def concatenate_wav_audios(base64_list: List[str]) -> Optional[str]:
 
         with wave.open(out_buf, "wb") as wav_writer:
             wav_writer.setparams(params)
+            # Start the output device before the first syllable, once per reply.
+            lead_frames = round(params.framerate * 0.35)
+            silent_byte = b"\x80" if params.sampwidth == 1 else b"\x00"
+            wav_writer.writeframes(silent_byte * lead_frames * params.nchannels * params.sampwidth)
             for r in wav_readers:
                 wav_writer.writeframes(r.readframes(r.getnframes()))
                 r.close()
@@ -62,7 +64,7 @@ def concatenate_wav_audios(base64_list: List[str]) -> Optional[str]:
         return base64.b64encode(out_buf.getvalue()).decode("utf-8")
     except Exception as e:
         print(f"[SarvamTTSAdapter] Error concatenating WAV audios: {e}")
-        return base64_list[0]
+        raise ProviderError('Sarvam audio could not be decoded.') from e
 
 
 class SarvamTTSAdapter(BaseTTSAdapter):
@@ -84,13 +86,7 @@ class SarvamTTSAdapter(BaseTTSAdapter):
     def synthesize(self, text: str, language_code: str = "hi-IN") -> Dict[str, Any]:
         current_key = self.api_key
         if not current_key:
-            return {
-                "success": True,
-                "provider": "browser_speech_synthesis",
-                "text": text,
-                "language_code": language_code,
-                "audio_base64": None
-            }
+            raise ProviderError("Sarvam speech synthesis failed: API key is missing.")
 
         headers = {
             "api-subscription-key": current_key,
@@ -123,33 +119,15 @@ class SarvamTTSAdapter(BaseTTSAdapter):
                 if resp.status_code == 200:
                     data = resp.json()
                     audios = data.get("audios", [])
+                    if len(audios) != len(b) or not all(audios):
+                        raise ProviderError("Sarvam speech synthesis failed: incomplete audio.")
                     all_audios.extend(audios)
                 else:
-                    print(f"[SarvamTTSAdapter] Batch error {resp.status_code}: {resp.text}")
-
-            if all_audios:
-                combined_b64 = concatenate_wav_audios(all_audios)
-                return {
-                    "success": True,
-                    "provider": "sarvam",
-                    "text": text,
-                    "audio_base64": combined_b64,
-                    "language_code": language_code
-                }
-            else:
-                return {
-                    "success": False,
-                    "provider": "browser_speech_synthesis",
-                    "text": text,
-                    "error": "Failed to synthesize audio chunks",
-                    "audio_base64": None
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "provider": "browser_speech_synthesis",
-                "text": text,
-                "error": str(e),
-                "audio_base64": None
-            }
-
+                    raise ProviderError(f"Sarvam speech synthesis failed (HTTP {resp.status_code}).")
+            combined = concatenate_wav_audios(all_audios)
+            if not combined:
+                raise ProviderError("Sarvam speech synthesis failed: empty audio.")
+            return {"success": True, "provider": "sarvam", "text": text,
+                    "audio_base64": combined, "language_code": language_code}
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            raise ProviderError("Sarvam speech synthesis failed to return audio.") from exc

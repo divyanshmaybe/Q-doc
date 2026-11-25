@@ -24,6 +24,7 @@ export async function careRequest(sessionId: string, suffix = "", body?: unknown
 }
 
 export interface TurnResponse {
+  audio_turn_index?: number;
   session_id: string;
   transcript_received: string;
   agent_response: string;
@@ -171,13 +172,14 @@ export async function sendTurn(
   sessionId: string,
   transcript: string,
   language: string = "en-IN",
-  audioBase64?: string
+  audioBase64?: string,
+  onRetry?: (number: number) => void
 ): Promise<TurnResponse> {
-  const payload: any = { transcript, language };
+  const payload: any = { transcript, language, defer_audio: true };
   if (audioBase64) {
     payload.audio_base64 = audioBase64;
   }
-  const res = await fetch(`${BASE_URL}/api/v1/session/${sessionId}/turn`, {
+  const res = await fetch(`${BASE_URL}/api/v1/session/${sessionId}/turn/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -186,7 +188,36 @@ export async function sendTurn(
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.detail || `HTTP failure ${res.status}: Failed to submit clinical turn.`);
   }
-  return res.json();
+  if (!res.body) throw new Error("The intake response was empty.");
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) throw new Error("The intake connection closed before a reply arrived.");
+      const lines = (buffer + value).split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const event = JSON.parse(line);
+        if (event.error) throw new Error(event.error);
+        if (event.result) return event.result;
+        if (event.retry) onRetry?.(event.retry);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function fetchTurnSpeech(sessionId: string, index: number): Promise<string | null> {
+  const response = await fetch(`${BASE_URL}/api/v1/session/${sessionId}/turn/${index}/speech`, {
+    method: "POST", signal: AbortSignal.timeout(25000),
+  }).catch((err) => {
+    throw new Error(err.name === "TimeoutError" ? "Sarvam speech request timed out." : "Could not reach the speech endpoint.");
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.audio_base64) throw new Error(data.detail || "Sarvam speech synthesis failed.");
+  return data.audio_base64;
 }
 
 export async function uploadPhoto(sessionId: string, file: File): Promise<PhotoResponse> {

@@ -4,13 +4,13 @@ import re
 
 from services.policy.rules import sanitize_safety_constraints
 
-FACTS = (
-    "body_site", "lesion_type", "duration_days", "age", "has_itching", "has_fever",
-    "has_pain", "is_spreading", "household_contacts_affected", "breathing_difficulty",
-    "mucosal_involvement", "is_pregnant", "patient_concern", "daily_impact",
-    "prior_treatments", "treatment_barriers", "safety_screen_complete", "nocturnal_itch", "triggers",
-)
+from services.dialogue.schemas import IntakeFacts
+
+FACTS = tuple(IntakeFacts.model_fields)
+INTRO_FIELDS = ("preferred_name", "age", "gender")
 QUESTIONS = {
+    "preferred_name": ("What name would you like me to use?", "मैं आपको किस नाम से बुलाऊँ?"),
+    "gender": ("How would you describe your gender? You can skip this question.", "आप अपना जेंडर कैसे बताते हैं? चाहें तो यह सवाल छोड़ सकते हैं।"),
     "lesion_type": ("What does the affected skin look like — for example, bumps, scaling, or a change in colour?", "प्रभावित त्वचा कैसी दिखती है — दाने, पपड़ी या रंग में बदलाव?"),
     "age": ("How old is the person with the skin problem?", "जिस व्यक्ति को त्वचा की परेशानी है उसकी उम्र क्या है?"),
     "breathing_difficulty": ("Are you having difficulty breathing?", "क्या आपको सांस लेने में तकलीफ है?"),
@@ -40,6 +40,8 @@ def intake_red_flags(slots):
                         ("has_fever", "fever_with_rash"), ("is_pregnant", "pregnancy")):
         if getattr(slots, field, None) is True:
             flags.append(flag)
+    if slots.safety_screen_complete is False:
+        flags.append("positive_safety_screen")
     if slots.age is not None and slots.age < 1:
         flags.append("infant_under_1_year")
     return flags
@@ -73,6 +75,20 @@ class ConsultationPlanner:
         if len(slots.pending_clarifications) >= 8:
             slots.pending_clarifications = []
         ambiguous = intent.get("ambiguous_fields", [])
+        asked = slots.last_question_field
+        if asked in ("breathing_difficulty", "mucosal_involvement") and intent.get("safety_screen_complete") is True:
+            # A negative answer to a single prompt only covers that prompt.
+            intent.pop("safety_screen_complete")
+        unknown = list(intent.get("unknown_fields") or [])
+        if intent.get("answer_unknown") is True and not unknown:
+            unknown.append(asked)
+        for field in unknown:
+            if field in ("household_contacts_affected", "nocturnal_itch", "triggers", "prior_treatments", "daily_impact") and getattr(slots, field) is None:
+                slots.fact_status[field] = "patient_unsure"
+                intent[field] = None
+                slots.pending_clarifications = [f for f in slots.pending_clarifications if f != field]
+                if isinstance(ambiguous, list):
+                    ambiguous = [f for f in ambiguous if f != field]
         if not isinstance(ambiguous, list) or len(ambiguous) > 3:
             ambiguous = []
         for field in ambiguous:
@@ -89,6 +105,8 @@ class ConsultationPlanner:
                 candidate[field] = value
                 value = type(slots).model_validate(candidate).__getattribute__(field)
             except (ValueError, TypeError):
+                if field not in slots.pending_clarifications:
+                    slots.pending_clarifications.append(field)
                 continue
             if field in ("age", "duration_days") and (value < 0 or (field == "age" and value > 120)):
                 if field not in slots.pending_clarifications:
@@ -104,11 +122,15 @@ class ConsultationPlanner:
             slots.fact_status[field] = "denied" if value is False else "reported"
             if field in slots.pending_clarifications:
                 slots.pending_clarifications.remove(field)
-        if slots.last_question_field == "safety_screen_complete":
-            if intent.get("safety_screen_complete") is True or (
-                raw.strip() and intent.get("breathing_difficulty") is not True and intent.get("mucosal_involvement") is not True
-            ):
-                slots.safety_screen_complete = True
+            if field == "age":
+                slots.age_awaiting_confirmation = None
+        safety_parts = ("breathing_difficulty", "mucosal_involvement")
+        if slots.safety_screen_complete is None and all(getattr(slots, key) is False for key in safety_parts):
+            slots.safety_screen_complete = True
+            slots.fact_status["safety_screen_complete"] = "reported"
+        if slots.safety_screen_complete is True:
+            slots.pending_clarifications = [key for key in slots.pending_clarifications
+                                           if key != "safety_screen_complete"]
         if any(word in lower for word in ("not achieved", "notes on teaching")):
             if "has_itching" not in slots.pending_clarifications:
                 slots.pending_clarifications.append("has_itching")
@@ -147,7 +169,20 @@ class ConsultationPlanner:
         if slots.pending_clarifications:
             field = slots.pending_clarifications[0]
             question = QUESTIONS.get(field, ("Could you clarify that detail?", "कृपया यह जानकारी स्पष्ट करें।"))[hi]
+            if field == "age" and slots.age_awaiting_confirmation is not None:
+                age = slots.age_awaiting_confirmation
+                question = choose(f"Did you mean {age} years old?", f"क्या आपकी उम्र {age} साल है?")
             return respond("clarify", "history", choose("I am not certain I heard that correctly. ", "मुझे यह बात साफ समझ नहीं आई। ") + question, field)
+        if slots.introduction_pending:
+            if asked in INTRO_FIELDS and (intent.get("declined_current_question") or intent.get("answer_unknown")):
+                slots.fact_status[asked] = "skipped"
+            for field in INTRO_FIELDS:
+                if getattr(slots, field) is None and slots.fact_status.get(field) != "skipped":
+                    return respond("ask_question", "history", QUESTIONS[field][hi], field)
+            slots.introduction_pending = False
+            if not any((slots.body_site, slots.lesion_type, slots.patient_concern, slots.has_itching, slots.has_pain)):
+                return respond("ask_question", "history", choose("What skin concern brings you in today?",
+                               "आज आपको त्वचा की क्या परेशानी हो रही है?"))
         if slots.reviewed_plan:
             if any(w in lower for w in ("afford", "cost", "expensive", "पैसे", "महंगा")):
                 slots.treatment_barriers = raw
@@ -163,21 +198,74 @@ class ConsultationPlanner:
             return respond("check_understanding", "follow_up", choose(
                 "Your recorded next step is: " + slots.reviewed_plan + " What questions or practical difficulties do you have with that next step?",
                 "आपका दर्ज अगला कदम है: " + slots.reviewed_plan + " इसे करने में कोई सवाल या परेशानी है?"))
-        required = ["body_site", "duration_days", "has_fever", "safety_screen_complete", "has_itching", "has_pain", "is_spreading", "prior_treatments"]
+        basics = ["body_site", "duration_days", "has_fever", "safety_screen_complete"]
+        required = basics + ["has_itching", "has_pain", "is_spreading", "prior_treatments"]
         if slots.has_itching:
             required.extend(["household_contacts_affected", "nocturnal_itch"])
         if any(term in " ".join(slots.suspected_differentials).lower() for term in ("eczema", "dermatitis", "urticaria")):
             required.append("triggers")
         required.extend(["patient_concern", "daily_impact"])
-        missing = [field for field in required if getattr(slots, field) is None]
+        missing = [field for field in required if getattr(slots, field) is None
+                   and slots.fact_status.get(field) != "patient_unsure"]
         slots.missing_required_slots = missing
         if self.max_turns is not None and slots.turn_count >= self.max_turns and missing:
             slots.handoff_required = True
             slots.handoff_urgency = "seek_opd"
             return respond("handoff", "handoff", choose("We still have important unanswered questions. Please have a clinician complete the assessment.", "कुछ जरूरी जानकारी अभी बाकी है। कृपया डॉक्टर से जांच पूरी करवाएं।"))
+        before_photo = not slots.photo_image_id and not slots.photo_declined
+        basic_missing = [field for field in basics if field in missing]
+        if before_photo and not basic_missing and slots.safety_screen_complete is True:
+            return respond("request_photo", "photo", choose(
+                "If you are comfortable, take a clear photo in good light. Avoid including your face or identifying details unless needed; for a private area, you may skip the photo and arrange an examination.",
+                "यदि आप सहज हों तो अच्छी रोशनी में साफ फोटो लें। जरूरी न हो तो पहचान दिखाने से बचें। निजी हिस्से की फोटो छोड़कर डॉक्टर से जांच करवा सकते हैं।"))
+        if slots.photo_image_id and not basic_missing:
+            from services.clinical_knowledge.coverage import get_coverage
+            coverage = get_coverage(slots.primary_suspected_condition)
+            condition_id = coverage["condition_id"]
+            if condition_id != "other_unclear" and condition_id not in slots.condition_specific_history:
+                # Capture the answer verbatim; do not manufacture structured diagnostic findings.
+                from services.clinical_knowledge.questions import screening_question
+                prompt = screening_question(condition_id, lang)
+                return respond("ask_question", "history", prompt, f"condition_history:{condition_id}")
         if missing:
+            suggested = intent.get("next_field")
+            question = intent.get("next_question")
+            eligible = [field for field in QUESTIONS if getattr(slots, field) is None
+                        and slots.fact_status.get(field) not in ("patient_unsure", "skipped")
+                        and field not in ("preferred_name", "gender")
+                        and not (slots.safety_screen_complete and field in safety_parts)]
+            def safety_question(field):
+                if field == "safety_screen_complete":
+                    remaining = [part for part in safety_parts if getattr(slots, part) is None]
+                    if len(remaining) == 1:
+                        field = remaining[0]
+                return field, QUESTIONS[field][hi]
+            def usable(field, text):
+                return (field in eligible and isinstance(text, str) and 0 < len(text.strip()) <= 280
+                        and sanitize_safety_constraints(text) == text)
+
+            if (intent.get("model_planned") or "next_field" in intent or "next_question" in intent) and not usable(suggested, question):
+                revised = self.llm.generate_json(
+                    "Revise the follow-up. Return next_field from eligible and next_question, one natural "
+                    "question in the requested language. Follow the latest answer and stage goal. "
+                    "Do not ask about answered facts or give clinical advice.",
+                    json.dumps({"eligible": eligible, "known": {k: getattr(slots, k) for k in FACTS if getattr(slots, k) is not None},
+                                "language": lang, "recent_dialogue": [{"speaker": t.get("speaker"), "text": t.get("transcript")} for t in history[-6:]],
+                                "latest_answer": raw, "photo_history": slots.condition_specific_history,
+                                "stage_goal": basic_missing if before_photo else missing}, ensure_ascii=False))
+                suggested, question = revised.get("next_field"), revised.get("next_question")
+                if not usable(suggested, question):
+                    from services.gateway.errors import ProviderError
+                    raise ProviderError("Gemini could not produce a relevant follow-up question.")
+            if usable(suggested, question):
+                if suggested == "safety_screen_complete" or suggested in safety_parts:
+                    suggested, question = safety_question(suggested)
+                if sanitize_safety_constraints(question) == question:
+                    return respond("ask_question", "history", question.strip(), suggested)
             field = missing[0]
             fallback = QUESTIONS[field][hi]
+            if field == "safety_screen_complete":
+                field, fallback = safety_question(field)
             if field == "has_pain" and re.search(r"\b(itch\w*)\b|खुजली|khujli", lower):
                 fallback = choose(
                     "I've noted the itching. Is there pain as well, or only itching?",
@@ -190,19 +278,6 @@ class ConsultationPlanner:
                     f"आपके {slots.body_site} की परेशानी दर्ज कर ली है। "
                 ) + fallback
             return respond("ask_question", "history", fallback, field)
-        if not slots.photo_image_id and not slots.photo_declined:
-            return respond("request_photo", "photo", choose(
-                "If you are comfortable, take a clear photo in good light. Avoid including your face or identifying details unless needed; for a private area, you may skip the photo and arrange an examination.",
-                "यदि आप सहज हों तो अच्छी रोशनी में साफ फोटो लें। जरूरी न हो तो पहचान दिखाने से बचें। निजी हिस्से की फोटो छोड़कर डॉक्टर से जांच करवा सकते हैं।"))
-        if slots.photo_image_id:
-            from services.clinical_knowledge.coverage import get_coverage
-            coverage = get_coverage(slots.primary_suspected_condition)
-            condition_id = coverage["condition_id"]
-            if condition_id != "other_unclear" and condition_id not in slots.condition_specific_history:
-                # Capture the answer verbatim; do not manufacture structured diagnostic findings.
-                from services.clinical_knowledge.questions import screening_question
-                prompt = screening_question(condition_id, lang)
-                return respond("ask_question", "history", prompt, f"condition_history:{condition_id}")
         if not slots.summary_confirmed:
             summary = choose(
                 f"Let me check: {slots.lesion_type or 'a skin problem'} on your {slots.body_site}, starting about {slots.duration_days} days ago. Your main concern is: {slots.patient_concern}. Is that correct, or should I change anything?",

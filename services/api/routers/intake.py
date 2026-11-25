@@ -10,12 +10,16 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import json
 import base64
+import asyncio
+from fastapi.responses import StreamingResponse
+from services.gateway.llm import retry_notice
 
 from services.api.database import DatabaseRepo
 from services.dialogue.schemas import ClinicalIntakeSlots
 from services.dialogue.state import restore_intake
 from services.dialogue.manager import DialogueManager
 from services.dialogue.language import detect_language
+from services.gateway.errors import ProviderError
 from services.gateway.stt import SarvamSTTAdapter
 from services.gateway.tts import SarvamTTSAdapter
 
@@ -26,8 +30,47 @@ tts_adapter = SarvamTTSAdapter()
 
 class TextTurnRequest(BaseModel):
     transcript: str
+    defer_audio: bool = False
     audio_base64: Optional[str] = None
     language: Optional[str] = None
+
+
+@router.post("/api/v1/session/{session_id}/turn/stream")
+async def stream_intake_turn(session_id: str, req: TextTurnRequest):
+    events = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def publish(event):
+        loop.call_soon_threadsafe(events.put_nowait, event)
+
+    def run():
+        token = retry_notice.set(lambda number: publish({"retry": number}))
+        try:
+            publish({"result": process_intake_turn(session_id, req)})
+        except ProviderError as exc:
+            publish({"error": str(exc)})
+        except HTTPException as exc:
+            publish({"error": exc.detail})
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Intake turn failed")
+            publish({"error": "The intake request failed."})
+        finally:
+            retry_notice.reset(token)
+
+    async def stream():
+        worker = asyncio.create_task(asyncio.to_thread(run))
+        try:
+            while True:
+                event = await events.get()
+                yield json.dumps(event) + "\n"
+                if "retry" not in event:
+                    break
+        finally:
+            await worker
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 @router.post("/api/v1/session/{session_id}/turn")
 def process_intake_turn(
@@ -53,9 +96,13 @@ def process_intake_turn(
         try:
             audio_bytes = base64.b64decode(req.audio_base64)
             stt_res = stt_adapter.transcribe(audio_bytes, language_code=req_lang)
+            if not stt_res.get("success"):
+                raise ProviderError("Sarvam speech recognition failed.")
             transcript = stt_res.get("transcript", "").strip()
-        except Exception:
-            transcript = ""
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderError("Sarvam speech recognition failed.") from exc
 
     # If no speech was captured (e.g. ambient silence or pause), respond politely without error
     if not transcript:
@@ -71,7 +118,7 @@ def process_intake_turn(
             "slots": current_slots.model_dump(),
             "turn_index": turn_idx,
             "language": req_lang,
-            "audio": None,
+            "audio": tts_adapter.synthesize(fallback_msg, language_code=req_lang),
             "is_ready_for_photo": False
         }
 
@@ -122,22 +169,25 @@ def process_intake_turn(
         try:
             from services.api.routers.analysis import analyze_session
             verdict_data = analyze_session(session_id, image_id=updated_slots.photo_image_id)
+        except ProviderError:
+            raise
         except Exception as e:
             print(f"[IntakeRouter] Auto-analysis synthesis error: {e}")
 
     if verdict_data:
         agent_msg = verdict_data["policy_decision"]["spoken_patient_message"]
-        updated_slots.reviewed_plan = agent_msg
-        updated_slots.consultation_stage = "follow_up"
-        DatabaseRepo.log_turn(session_id, turn_idx + 2, "agent", agent_msg, updated_slots.model_dump_json())
+        updated_slots = restore_intake(DatabaseRepo.get_session_turns(session_id), lang)
 
-    # 6. Synthesize TTS response
-    speech_res = tts_adapter.synthesize(agent_msg, language_code=lang)
+    if verdict_data:
+        speech_res = verdict_data["audio"]
+    else:
+        speech_res = None if req.defer_audio else tts_adapter.synthesize(agent_msg, language_code=lang)
 
     return {
         "session_id": session_id,
         "transcript_received": transcript,
         "agent_response": agent_msg,
+        "audio_turn_index": turn_idx + (2 if verdict_data else 1),
         "slots": updated_slots.model_dump(),
         "is_ready_for_photo": is_ready_for_photo,
         "is_final_verdict_ready": updated_slots.is_final_verdict_ready,
@@ -148,4 +198,12 @@ def process_intake_turn(
         "language": lang,
         "verdict_data": verdict_data
     }
+
+
+@router.post("/api/v1/session/{session_id}/turn/{turn_index}/speech")
+def synthesize_turn(session_id: str, turn_index: int):
+    for turn in DatabaseRepo.get_session_turns(session_id):
+        if turn["turn_index"] == turn_index and turn["speaker"] == "agent":
+            return tts_adapter.synthesize(turn["transcript"], language_code=turn["slots"].get("primary_language") or "en-IN")
+    raise HTTPException(status_code=404, detail="Reply not found")
 

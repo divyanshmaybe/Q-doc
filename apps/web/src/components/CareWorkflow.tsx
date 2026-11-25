@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { careRequest } from "../services/api";
 import { CLINICIAN_WORKFLOW_ENABLED } from "../features";
 
-export function CareWorkflow({ sessionId }: { sessionId: string }) {
+export function CareWorkflow({ sessionId, reviewer = false }: { sessionId: string; reviewer?: boolean }) {
   const [care, setCare] = useState<any>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState("");
   const [form, setForm] = useState({ reviewer_name: "", registration_id: "", diagnosis: "", instructions: "", follow_up: "", return_precautions: "", language: "en-IN" });
+  const [draftVersion, setDraftVersion] = useState("");
+  const [checks, setChecks] = useState("");
   const [progress, setProgress] = useState("same");
   const [notes, setNotes] = useState("");
   const [urgent, setUrgent] = useState(false);
@@ -48,18 +50,26 @@ export function CareWorkflow({ sessionId }: { sessionId: string }) {
           speech.lang = care.plan.language; window.speechSynthesis.speak(speech);
         }} className="text-electric-light">Listen to the signed plan</button>
       </div>}
-      {CLINICIAN_WORKFLOW_ENABLED && <details className="text-sm text-white/80"><summary>Reviewer workspace</summary>
+      {CLINICIAN_WORKFLOW_ENABLED && reviewer && <details className="text-sm text-white/80"><summary>Reviewer workspace</summary>
         <div className="space-y-2 pt-3">
           <p>Draft reference — review and individualize before signing.</p>
           <p>{care.draft?.display_name}</p><p>{care.draft?.treatment_summary}</p>
           {(care.draft?.basic_care || []).map((line: string) => <p key={line}>{line}</p>)}
           {(care.draft?.sources || []).map((url: string) => <a key={url} href={url} target="_blank" rel="noreferrer" className="block text-electric-light break-all">Reference: {new URL(url).hostname}</a>)}
           <label>Reviewer credential<input type="password" autoComplete="off" className={input} value={key} onChange={e => setKey(e.target.value)} /></label>
+          <button disabled={busy || !key || care.screening?.needs_update} className="text-electric-light" onClick={() => perform(async () => {
+            const result = await careRequest(sessionId, "/prepare", {}, key);
+            const {reasoning_and_checks, ...draft} = result.draft;
+            setForm(prev => ({ ...prev, ...draft, language: "en-IN" }));
+            setChecks(reasoning_and_checks);
+            setDraftVersion(result.evidence_version);
+          })}>Generate clinical draft for review</button>
+          {checks && <p><strong>Clinical reasoning and checks before signing</strong><br />{checks}</p>}
           {([['reviewer_name', 'Reviewer name'], ['registration_id', 'Registration ID'], ['diagnosis', 'Clinical assessment'], ['instructions', 'Patient instructions'], ['follow_up', 'Follow-up timing and action'], ['return_precautions', 'When to seek help']] as const).map(([name, label]) =>
             <label className="block" key={name}>{label}<textarea className={input} value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })} /></label>)}
           <label>Plan language<select className={input} value={form.language} onChange={e => setForm({ ...form, language: e.target.value })}><option value="en-IN">English</option><option value="hi-IN">Hindi</option></select></label>
           <button disabled={busy || !key} className="text-electric-light" onClick={() => perform(async () => {
-            await careRequest(sessionId, "/sign", { ...form, evidence_version: care.evidence_version }, key);
+            await careRequest(sessionId, "/sign", { ...form, evidence_version: draftVersion || care.evidence_version }, key);
             setKey(""); await refresh(); setNotice("Plan signed and available to the patient.");
           })}>Sign and release plan</button>
         </div>

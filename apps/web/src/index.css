@@ -329,3 +329,32 @@ body {
   .qdoc-workspace .workspace-header { padding-inline:12px; }
   .workspace-actions > button { min-height:44px; }
 }
+
+/* Reserve the short-screen viewport for speech, the reply and the composer. */
+.qdoc-workspace:has(.consultation-stage) { height: 100dvh; min-height: 0; }
+@media (max-height: 850px) {
+  .qdoc-workspace main:has(.consultation-stage) { padding-block: 6px; }
+  .qdoc-workspace .consultation-stage { padding-block: 6px; row-gap: 12px; }
+  .consultation-heading > .studio-eyebrow, .consultation-heading > p,
+  .consultation-heading nav > p, .consultation-composer .composer-note { display: none; }
+  .qdoc-workspace .consultation-heading h1 { margin: 0; font-size: 1.5rem; }
+  .qdoc-workspace .conversation-panel { padding: 12px 16px; }
+  .qdoc-workspace .voice-presence { padding: 8px 0; }
+  .voice-console { padding: 8px; }
+  .doctor-voice-scene { gap: 4px; }
+  .doctor-voice-scene .doctor-portrait { width: clamp(70px, 13vh, 112px); }
+  .doctor-voice-scene .voice-signal { height: 16px; width: 130px; gap: 4px; }
+  .doctor-voice-scene .voice-signal span { height: 16px; }
+  .voice-console .voice-console-controls { gap: 4px 12px; margin-top: 6px; }
+  .voice-console-controls [role="status"] { flex-basis: auto; }
+  .qdoc-workspace .consultation-composer { padding-block: 5px max(6px, env(safe-area-inset-bottom)); }
+  .consultation-composer form { padding-block: 3px; }
+}
+@media (min-width: 800px) and (max-height: 850px) {
+  .consultation-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .consultation-heading nav { flex: 1; }
+}
+@media (max-height: 720px) {
+  .conversation-panel .conversation-hint { display: none; }
+  .qdoc-workspace .workspace-header:has(+ main .consultation-stage) { min-height: 54px; padding-block: 4px; }
+}

@@ -13,6 +13,79 @@ def manager():
     return DialogueManager(llm_adapter=OfflineLLM())
 
 
+def test_separate_safety_denials_open_photo_without_repeating_combined_screen():
+    dm = manager()
+    slots = ClinicalIntakeSlots(primary_language="hi-IN", body_site="पैर", duration_days=4,
+                                has_fever=False, last_question_field="breathing_difficulty")
+    slots, question, ready, _ = dm.process_turn(slots, "नहीं।")
+    assert not ready and slots.safety_screen_complete is None
+    assert slots.last_question_field == "mucosal_involvement" and "सांस" not in question
+    slots = ClinicalIntakeSlots.model_validate_json(slots.model_dump_json())
+    slots, _, ready, _ = dm.process_turn(slots, "नहीं।")
+    assert ready and slots.safety_screen_complete is True
+
+
+def test_unclear_spoken_age_requires_confirmation():
+    class AgeGuess:
+        def generate_json(self, *args):
+            return {"age": 20}
+    dm = DialogueManager(llm_adapter=AgeGuess())
+    slots = ClinicalIntakeSlots(last_question_field="age")
+    slots, question, *_ = dm.process_turn(slots, "बी साल।")
+    assert slots.age is None and "20" in question
+    slots, _, *_ = dm.process_turn(slots, "हाँ।")
+    assert slots.age == 20 and slots.age_awaiting_confirmation is None
+
+
+def test_all_extracted_fact_types_persist_and_can_be_corrected():
+    from services.dialogue.schemas import IntakeFacts
+    from services.gateway.llm import IntakeReply
+
+    planner = ConsultationPlanner(OfflineLLM())
+    properties = IntakeFacts.model_json_schema()["properties"]
+    examples = {"boolean": (True, False), "integer": (3, 2), "string": ("first answer", "correction")}
+    for field, definition in properties.items():
+        kind = next(t["type"] for t in definition["anyOf"] if t["type"] != "null")
+        slots = ClinicalIntakeSlots()
+        for value in examples[kind]:
+            reply = IntakeReply.model_validate({field: value}, strict=True)
+            slots, *_ = planner.step(slots, reply.model_dump(exclude_unset=True), [], "en")
+            slots = ClinicalIntakeSlots.model_validate_json(slots.model_dump_json())
+            assert getattr(slots, field) == value, field
+            assert field not in slots.missing_required_slots
+
+
+def test_negative_night_itch_and_uncertain_household_answer_survive_restore():
+    planner = ConsultationPlanner(OfflineLLM())
+    slots = ClinicalIntakeSlots(has_itching=True, last_question_field="nocturnal_itch")
+    slots, *_ = planner.step(slots, {"nocturnal_itch": False, "raw_transcript": "नहीं बढ़ती।"}, [], "hi")
+    slots = ClinicalIntakeSlots.model_validate_json(slots.model_dump_json())
+    assert slots.nocturnal_itch is False
+    assert "nocturnal_itch" not in slots.missing_required_slots
+    slots.last_question_field = "household_contacts_affected"
+    slots, *_ = planner.step(slots, {"answer_unknown": True, "raw_transcript": "मुझे पता नहीं।"}, [], "hi")
+    assert slots.household_contacts_affected is None
+    assert "household_contacts_affected" not in slots.missing_required_slots
+    assert slots.fact_status["household_contacts_affected"] == "patient_unsure"
+
+
+def test_greeting_then_contextual_followup():
+    class ContextLLM:
+        def generate_json(self, system, prompt):
+            assert "What’s been bothering you?" in prompt
+            return {"has_itching": True, "next_field": "duration_days",
+                    "next_question": "When did the nighttime itching start?"}
+
+    dm = DialogueManager(llm_adapter=ContextLLM())
+    slots, welcome, _, _ = dm.process_turn(ClinicalIntakeSlots(primary_language="en-IN"), "Hi!")
+    assert welcome.startswith("Hi!")
+    assert slots.last_question_field is None
+    slots, question, _, _ = dm.process_turn(slots, "Hi doctor, my arms itch at night.")
+    assert slots.has_itching
+    assert slots.last_question_field == "duration_days"
+    assert question == "When did the nighttime itching start?"
+
+
 def complete_slots(**overrides):
     values = dict(primary_language="en-IN", body_site="hands", duration_days=14,
                   has_itching=False, has_fever=False, has_pain=False, is_spreading=False,
@@ -20,6 +93,20 @@ def complete_slots(**overrides):
                   daily_impact="none", photo_image_id="image1")
     values.update(overrides)
     return ClinicalIntakeSlots(**values)
+
+
+def test_revise_answered_topic_and_follow_patient_before_photo():
+    class Revision:
+        def generate_json(self, system, prompt):
+            assert '"body_site": "arms"' in prompt
+            return {"next_field": "daily_impact", "next_question": "क्या खुजली से आपकी नींद खुलती है?"}
+
+    planner = ConsultationPlanner(Revision())
+    slots = ClinicalIntakeSlots(body_site="arms")
+    slots, question, *_ = planner.step(slots, {"raw_transcript": "रात को खुजली होती है",
+        "next_field": "body_site", "next_question": "कहाँ?"}, [], "hi")
+    assert slots.last_question_field == "daily_impact"
+    assert "नींद" in question
 
 
 def test_correction_and_raw_history_survive_serialization():

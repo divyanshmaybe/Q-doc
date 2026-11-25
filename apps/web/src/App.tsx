@@ -33,6 +33,7 @@ import { PatientHistory } from "./components/PatientHistory";
 import {
   startSession,
   sendTurn,
+  fetchTurnSpeech,
   uploadPhoto,
   analyzeSession,
   getAdminMode,
@@ -41,8 +42,8 @@ import {
   ClinicianBriefItem,
 } from "./services/api";
 
-const DEFAULT_WELCOME_EN = "Hello, I’m Q-Doc. I’m here to help you with any skin concerns you’re having. What skin issue are you facing and where on the body?";
-const DEFAULT_WELCOME_HI = "नमस्ते, मैं क्यू-डॉक हूँ। मैं आपकी त्वचा से जुड़ी परेशानी समझने में मदद कर सकता हूँ। मैं शुरुआती जाँच में मदद करता हूँ, और डॉक्टर इसकी पुष्टि कर सकते हैं। आपने क्या बदलाव देखा है?";
+const DEFAULT_WELCOME_EN = "Hello, I’m Q-Doc. I can help with your skin concern. What name would you like me to use?";
+const DEFAULT_WELCOME_HI = "नमस्ते, मैं क्यू-डॉक हूँ। आपकी त्वचा की परेशानी समझने में मदद कर सकता हूँ। मैं आपको किस नाम से बुलाऊँ?";
 
 const b64ToBlobUrl = (base64: string): string => {
   try {
@@ -74,7 +75,7 @@ export const App: React.FC = () => {
   });
   const viewRef = useRef(view);
   const activeTurnTokenRef = useRef(0);
-  const [mode, setMode] = useState<"autonomous" | "supervised">("autonomous");
+  const [mode, setMode] = useState<"autonomous" | "supervised">("supervised");
   const [patientEmail, setPatientEmail] = useState("");
 
   // ── Session state ──
@@ -88,7 +89,7 @@ export const App: React.FC = () => {
   const agentMessageRef = useRef<string | null>(DEFAULT_WELCOME_EN);
   const [latestAudioB64, setLatestAudioB64] = useState<string | null>(() => {
     try {
-      return localStorage.getItem("qdoc_welcome_v4_b64_en-IN") || null;
+      return localStorage.getItem("qdoc_welcome_v6_b64_en-IN") || null;
     } catch (_) {
       return null;
     }
@@ -112,7 +113,7 @@ export const App: React.FC = () => {
 
   const playbackTokenRef = useRef(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -122,62 +123,6 @@ export const App: React.FC = () => {
     sessionLangRef.current = sessionLang;
   }, [sessionLang]);
 
-  // Pre-load available system speech synthesis voices to prevent empty list race condition
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-    const updateVoices = () => {
-      const v = window.speechSynthesis.getVoices();
-      if (v && v.length > 0) {
-        voicesRef.current = v;
-      }
-    };
-    updateVoices();
-    window.speechSynthesis.onvoiceschanged = updateVoices;
-  }, []);
-
-  const getPreferredVoice = (isHi: boolean): SpeechSynthesisVoice | null => {
-    if (!("speechSynthesis" in window)) return null;
-    const voices = voicesRef.current.length > 0 ? voicesRef.current : window.speechSynthesis.getVoices();
-    if (!voices || voices.length === 0) return null;
-
-    if (isHi) {
-      const hindi = voices.find((v) => {
-        const n = v.name.toLowerCase();
-        const l = v.lang.toLowerCase();
-        return l.includes("hi") || n.includes("hindi") || n.includes("kalpana") || n.includes("hemant");
-      });
-      if (hindi) return hindi;
-    }
-
-    // Indian English Male voice matching (Rohan / Ravi priority)
-    // 1. Explicit search for "Rohan"
-    const rohan = voices.find((v) => v.name.toLowerCase().includes("rohan"));
-    if (rohan) return rohan;
-
-    // 2. Microsoft Ravi (English India, natural male clinician)
-    const ravi = voices.find((v) => v.name.toLowerCase().includes("ravi"));
-    if (ravi) return ravi;
-
-    // 3. Any Indian male voice
-    const indianMale = voices.find((v) => {
-      const n = v.name.toLowerCase();
-      const l = v.lang.toLowerCase();
-      return (l.includes("in") || n.includes("india")) && (n.includes("male") || n.includes("prabhat") || n.includes("madhav"));
-    });
-    if (indianMale) return indianMale;
-
-    // 4. Any Indian English voice (e.g. Google English India, Heera, etc.)
-    const indianGeneral = voices.find((v) => {
-      const n = v.name.toLowerCase();
-      const l = v.lang.toLowerCase().replace("_", "-");
-      return l.includes("en-in") || n.includes("india") || n.includes("heera") || n.includes("veena");
-    });
-    if (indianGeneral) return indianGeneral;
-
-    return null;
-  };
-
-  // ── Speech Playback (Sarvam base64 audio priority + WebSpeech fallback) ──
   const playSpeech = (text: string, audioB64?: string | null) => {
     // Strict Guard: Never speak if the user is not in the voice / kiosk demo view!
     if (viewRef.current !== "voice") {
@@ -203,106 +148,37 @@ export const App: React.FC = () => {
 
     setAgentPhase("speaking");
 
-    // 2. Play Sarvam synthesized audio if present
-    const b64 = audioB64;
-    if (b64) {
-      try {
-        const audioUrl = b64ToBlobUrl(b64);
-        const audio = new Audio(audioUrl);
-        activeAudioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          if (playbackToken !== playbackTokenRef.current) return;
-          setAgentPhase("idle");
-          setAutoplayBlocked(false);
-        };
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setAutoplayBlocked(false);
-            })
-            .catch((err) => {
-              if (playbackToken !== playbackTokenRef.current) return;
-              console.warn("[App] Audio play error / autoplay blocked:", err);
-              if (err.name === "NotAllowedError") {
-                setAutoplayBlocked(true);
-              }
-              if (err.name !== "AbortError" && viewRef.current === "voice") {
-                speakSynthesisFallback(text);
-              }
-            });
-        }
-        return;
-      } catch (err) {
-        console.warn("[App] Error creating Audio object:", err);
-      }
+    const fail = (message: string) => {
+      if (playbackToken !== playbackTokenRef.current) return;
+      setErrorMsg(message);
+      setAgentPhase("error");
+    };
+    if (!audioB64) {
+      fail("Sarvam returned no speech audio.");
+      return;
     }
-
-    // 3. Fallback to browser SpeechSynthesis only if no audioB64 provided
-    speakSynthesisFallback(text);
-  };
-
-  const speakSynthesisFallback = (text: string) => {
-    if (!("speechSynthesis" in window) || viewRef.current !== "voice") return;
     try {
-      (window as any).__currentUtterance = null;
-      window.speechSynthesis.cancel();
-
-      // Split long paragraph into natural sentences to prevent Chromium 15s freeze
-      const rawSentences = text.match(/[^.!?\n।]+[.!?\n।]+|[^.!?\n।]+/g) || [text];
-      const sentences = rawSentences.map((s) => s.trim()).filter(Boolean);
-      if (sentences.length === 0) return;
-
-      const playbackToken = playbackTokenRef.current;
-      let currentIndex = 0;
-      const activeLang = sessionLangRef.current || sessionLang;
-      const isHi = activeLang.toLowerCase().includes("hi");
-      const matchedVoice = getPreferredVoice(isHi);
-
-      const speakNextChunk = () => {
-        if (playbackToken !== playbackTokenRef.current) return;
-        if (viewRef.current !== "voice") {
-          (window as any).__currentUtterance = null;
-          return;
-        }
-        if (currentIndex >= sentences.length) {
-          (window as any).__currentUtterance = null;
-          if (viewRef.current === "voice") {
-            setAgentPhase("idle");
-          }
-          return;
-        }
-
-        const chunkText = sentences[currentIndex];
-        const u = new SpeechSynthesisUtterance(chunkText);
-        u.lang = matchedVoice ? matchedVoice.lang : (isHi ? "hi-IN" : "en-IN");
-        u.rate = 0.98;
-        u.pitch = 0.95;
-        if (matchedVoice) {
-          u.voice = matchedVoice;
-        }
-
-        // Retain reference on window to prevent Chrome garbage collector from killing it mid-speech
-        (window as any).__currentUtterance = u;
-
-        u.onend = () => {
-          currentIndex++;
-          speakNextChunk();
-        };
-
-        u.onerror = (e) => {
-          console.warn("[SpeechSynthesis] Chunk error, advancing:", e);
-          currentIndex++;
-          speakNextChunk();
-        };
-
-        window.speechSynthesis.speak(u);
+      const url = b64ToBlobUrl(audioB64);
+      const audio = new Audio(url);
+      activeAudioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (playbackToken === playbackTokenRef.current) setAgentPhase("idle");
       };
-
-      speakNextChunk();
-    } catch (err) {
-      console.warn("[SpeechSynthesis] Error:", err);
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        fail("Audio playback failed in this browser.");
+      };
+      audio.play().then(() => {
+        if (playbackToken === playbackTokenRef.current) setAutoplayBlocked(false);
+      }).catch(err => {
+        URL.revokeObjectURL(url);
+        if (playbackToken !== playbackTokenRef.current) return;
+        if (err.name === "NotAllowedError") setAutoplayBlocked(true);
+        fail(err.name === "NotAllowedError" ? "Your browser blocked audio playback." : "Audio playback failed in this browser.");
+      });
+    } catch {
+      fail("Audio playback failed in this browser.");
     }
   };
 
@@ -338,7 +214,7 @@ export const App: React.FC = () => {
         } catch (e: any) {
           if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
           pendingSessionRef.current = null;
-          setErrorMsg("Could not connect to session. Ensure backend server is running.");
+          setErrorMsg(e.message || "Could not connect to session.");
           setAgentPhase("error");
           return;
         }
@@ -351,7 +227,12 @@ export const App: React.FC = () => {
       setAgentMessage(currentLang.startsWith("hi") ? "लक्षणों का विश्लेषण हो रहा है..." : "Analyzing symptoms...");
 
       try {
-        const res = await sendTurn(activeSessionId, trimmed, currentLang, audioBase64);
+        const res = await sendTurn(activeSessionId, trimmed, currentLang, audioBase64, number => {
+          if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
+          setAgentMessage(currentLang.startsWith("hi")
+            ? `Gemini से जवाब नहीं मिला। दोबारा कोशिश हो रही है (${number}/3)…`
+            : `Waiting for Gemini. Retrying (${number}/3)…`);
+        });
         
         // Strict cancellation guard: discard if user navigated away or cancelled while analyzing
         if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") {
@@ -359,6 +240,7 @@ export const App: React.FC = () => {
           return;
         }
 
+        if (res.transcript_received) setLastUserSpeech(res.transcript_received);
         setSlots(res.slots || {});
 
         // Automatically update session language if language switch detected
@@ -371,21 +253,22 @@ export const App: React.FC = () => {
         setAgentPhase("speaking");
         setAgentMessage(res.agent_response);
         agentMessageRef.current = res.agent_response;
-        setLatestAudioB64(res.audio?.audio_base64 || null);
-        latestAudioB64Ref.current = res.audio?.audio_base64 || null;
-        playSpeech(res.agent_response, res.audio?.audio_base64);
+        setLatestAudioB64(null);
+        latestAudioB64Ref.current = null;
 
         if (res.verdict_data) {
           setVerdictData(res.verdict_data);
         }
 
-        if (res.is_ready_for_photo || res.confirmation_prompt) {
-          setPhotoReady(true);
-        }
+        setPhotoReady(Boolean(res.is_ready_for_photo));
 
-        setTimeout(() => {
-          if (viewRef.current === "voice") setAgentPhase("idle");
-        }, 3500);
+        const playbackToken = playbackTokenRef.current;
+        const audio = res.audio?.audio_base64 || (res.audio_turn_index !== undefined
+          ? await fetchTurnSpeech(activeSessionId, res.audio_turn_index) : null);
+        if (turnToken !== activeTurnTokenRef.current || playbackToken !== playbackTokenRef.current || viewRef.current !== "voice") return;
+        setLatestAudioB64(audio);
+        latestAudioB64Ref.current = audio;
+        playSpeech(res.agent_response, audio);
       } catch (err: any) {
         if (turnToken !== activeTurnTokenRef.current || viewRef.current !== "voice") return;
         console.error("[App] Turn error:", err);
@@ -399,7 +282,7 @@ export const App: React.FC = () => {
     [sessionId, mode, sessionLang, patientEmail]
   );
 
-  const voice = useVoiceEngine({ onFinalTranscript: handleFinalTranscript, language: sessionLang });
+  const voice = useVoiceEngine({ onFinalTranscript: handleFinalTranscript });
 
   // Sync voice engine state → agentPhase
   useEffect(() => {
@@ -430,7 +313,7 @@ export const App: React.FC = () => {
       } catch (_) {}
     }
     try {
-      voice.stopListening();
+      voice.cancelListening();
     } catch (_) {}
     setAgentPhase("idle");
   };
@@ -490,7 +373,7 @@ export const App: React.FC = () => {
 
     // Load cached audio from localStorage if available
     try {
-      const cachedB64 = localStorage.getItem("qdoc_welcome_v4_b64_" + targetLang);
+      const cachedB64 = localStorage.getItem("qdoc_welcome_v6_b64_" + targetLang);
       if (cachedB64) {
         setLatestAudioB64(cachedB64);
         latestAudioB64Ref.current = cachedB64;
@@ -519,7 +402,7 @@ export const App: React.FC = () => {
       // Save to localStorage for instant subsequent launches
       if (res.audio?.audio_base64) {
         try {
-          localStorage.setItem("qdoc_welcome_v4_b64_" + (res.language || targetLang), res.audio.audio_base64);
+          localStorage.setItem("qdoc_welcome_v6_b64_" + (res.language || targetLang), res.audio.audio_base64);
         } catch (_) {}
       }
 
@@ -561,20 +444,13 @@ export const App: React.FC = () => {
 
     let welcomeB64: string | null = null;
     try {
-      welcomeB64 = localStorage.getItem("qdoc_welcome_v4_b64_" + targetLang);
+      welcomeB64 = localStorage.getItem("qdoc_welcome_v6_b64_" + targetLang);
     } catch (_) {}
-    if (!welcomeB64) {
-      welcomeB64 = latestAudioB64Ref.current;
-    }
-
-    // Direct synchronous speech launch inside the user's click gesture - ALWAYS GREET!
-    playSpeech(defaultMsg, welcomeB64);
-
-    // Initialize fresh session in background for this consultation
-    startSessionInBackground(targetLang);
+    if (welcomeB64) playSpeech(defaultMsg, welcomeB64);
+    startSessionInBackground(targetLang, !welcomeB64);
   };
 
-  const startSessionInBackground = async (targetLang: string) => {
+  const startSessionInBackground = async (targetLang: string, speakWelcome: boolean) => {
     const pending = startSession(targetLang, mode, patientEmail);
     pendingSessionRef.current = pending;
     try {
@@ -588,16 +464,18 @@ export const App: React.FC = () => {
       }
       setSlots(res.slots || {});
       if (res.audio?.audio_base64) {
+        if (speakWelcome && viewRef.current === "voice") playSpeech(res.agent_message, res.audio.audio_base64);
         latestAudioB64Ref.current = res.audio.audio_base64;
         setLatestAudioB64(res.audio.audio_base64);
         try {
-          localStorage.setItem("qdoc_welcome_v4_b64_" + (res.language || targetLang), res.audio.audio_base64);
+          localStorage.setItem("qdoc_welcome_v6_b64_" + (res.language || targetLang), res.audio.audio_base64);
         } catch (_) {}
       }
     } catch (err: any) {
       if (pendingSessionRef.current !== pending) return;
       pendingSessionRef.current = null;
-      console.warn("[App] Background session start:", err);
+      setErrorMsg(err.message || "Session start failed.");
+      setAgentPhase("error");
     }
   };
 
@@ -612,7 +490,7 @@ export const App: React.FC = () => {
     viewRef.current = "clinician";
     setView("clinician");
     stopSpeech();
-    loadBriefs();
+    loadBriefs(verdictData?.session_id);
     if (typeof window !== "undefined") window.location.hash = "#clinician";
   };
 
@@ -641,7 +519,7 @@ export const App: React.FC = () => {
       if (!photoRes.quality_passed) {
         setAgentMessage(photoRes.message);
         setAgentPhase("speaking");
-        playSpeech(photoRes.message);
+        playSpeech(photoRes.message, photoRes.audio?.audio_base64);
         setTimeout(() => {
           if (viewRef.current === "voice") setAgentPhase("idle");
         }, 2500);
@@ -720,11 +598,12 @@ export const App: React.FC = () => {
     }
   };
 
-  const loadBriefs = async () => {
+  const loadBriefs = async (preferredSession?: string) => {
     try {
       const list = await listAllBriefs();
       setBriefs(list);
-      if (list.length > 0 && !selectedBrief) setSelectedBrief(list[0]);
+      if (preferredSession) setSelectedBrief(list.find(b => b.session_id === preferredSession) || null);
+      else if (list.length > 0 && !selectedBrief) setSelectedBrief(list[0]);
     } catch (_) {}
   };
 
@@ -902,7 +781,7 @@ export const App: React.FC = () => {
               <div className="conversation-panel">
                 <div className="conversation-panel-heading"><span className="studio-eyebrow">CONVERSATION</span><span className="conversation-tag">Voice + text</span></div>
                 <div className="voice-presence">
-              <div className="orb-stage">
+              {!verdictData && <div className="orb-stage">
               <AICoreVisualizer
                 phase={agentPhase}
                 audioLevel={voice.audioLevel}
@@ -910,7 +789,7 @@ export const App: React.FC = () => {
                 disabled={agentPhase === "thinking" || agentPhase === "connecting"}
               />
 
-              </div>
+              </div>}
 
               {/* Autoplay unlock prompt (if browser blocked sound) */}
               <AnimatePresence>
@@ -936,7 +815,7 @@ export const App: React.FC = () => {
                 </div>
                 <AgentTranscript
                 agentMessage={agentMessage}
-                interimTranscript={voice.interimTranscript}
+                interimTranscript=""
                 lastUserSpeech={lastUserSpeech}
                 onReplay={() => agentMessage && playSpeech(agentMessage, latestAudioB64)}
               />
@@ -1028,12 +907,15 @@ export const App: React.FC = () => {
                     {verdictData.reasoner_output.assessment_source === "local_heuristic" &&
                       <p role="status" className="text-xs text-amber-200">Full image reasoning was unavailable. This result uses the limited local fallback.</p>}
 
+                    <button type="button" onClick={handleReturnHome} className="venture-demo-button">
+                      {sessionLang.startsWith("hi") ? "परामर्श समाप्त करें" : "Finish consultation"}
+                    </button>
                     {CLINICIAN_WORKFLOW_ENABLED && verdictData.doctor_brief_id && (
                       <button
                         onClick={handleOpenClinician}
                         className="text-[10px] font-mono text-white/50 hover:text-electric-light transition text-center pt-1"
                       >
-                        View Clinician Brief →
+                        {sessionLang.startsWith("hi") ? "डॉक्टर की समीक्षा खोलें →" : "Open clinician review →"}
                       </button>
                     )}
                   </motion.div>
@@ -1155,6 +1037,7 @@ export const App: React.FC = () => {
                 {/* Brief HUD */}
                 <div className="md:col-span-8">
                   <ClinicianBrief briefData={selectedBrief} onRefresh={loadBriefs} />
+                  {selectedBrief && <CareWorkflow key={selectedBrief.session_id} sessionId={selectedBrief.session_id} reviewer />}
                 </div>
               </div>
             </motion.div>
@@ -1163,7 +1046,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* ── BOTTOM DRAWER & INTUITIVE INPUT FALLBACK ── */}
-      {view === "voice" && (
+      {view === "voice" && !verdictData && (
         <div className="consultation-composer relative z-20 pb-5 px-4 flex flex-col items-center gap-3 mx-auto w-full shrink-0">
           {/* Biomarker Pills Drawer */}
 

@@ -35,7 +35,7 @@ def _get_cached_welcome_audio(text: str, language_code: str) -> Dict[str, Any]:
         return _WELCOME_AUDIO_CACHE[lang_key]
 
     # 2. Check disk cache
-    cache_file = os.path.join(_CACHE_DIR, f"welcome_v4_{lang_key.replace('-', '_')}.json")
+    cache_file = os.path.join(_CACHE_DIR, f"welcome_v6_{lang_key.replace('-', '_')}.json")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
@@ -83,13 +83,13 @@ def start_session(req: StartSessionRequest):
     patient = link_patient(session_id, email) if email else None
 
     welcome_text = (
-        "नमस्ते, मैं क्यू-डॉक हूँ। मैं आपकी त्वचा से जुड़ी परेशानी समझने में मदद कर सकता हूँ। मैं शुरुआती जाँच में मदद करता हूँ, और डॉक्टर इसकी पुष्टि कर सकते हैं। आपने क्या बदलाव देखा है?"
+        "नमस्ते, मैं क्यू-डॉक हूँ। आपकी त्वचा की परेशानी समझने में मदद कर सकता हूँ। मैं आपको किस नाम से बुलाऊँ?"
         if "hi" in req.language.lower()
-        else "Hello, I’m Q-Doc. I’m here to help you with any skin concerns you’re having. What skin issue are you facing and where on the body?"
+        else "Hello, I’m Q-Doc. I can help with your skin concern. What name would you like me to use?"
     )
 
     # Log turn 0
-    initial_slots = ClinicalIntakeSlots(primary_language=req.language, age=req.age, sex=req.sex)
+    initial_slots = ClinicalIntakeSlots(primary_language=req.language, age=req.age, sex=req.sex, introduction_pending=True, last_question_field="preferred_name")
     DatabaseRepo.log_turn(session_id, 0, "agent", welcome_text, initial_slots.model_dump_json())
 
     # Speech synthesis with instantaneous cache

@@ -165,6 +165,9 @@ export const ClinicianBrief: React.FC<ClinicianBriefProps> = ({
               <Clock className="w-3 h-3 text-slate-500" />
               TIMESTAMP: {demo.consultation_timestamp || new Date().toISOString()}
             </span>
+            {demo.preferred_name && <span>{demo.preferred_name}</span>}
+            {demo.age != null && <span>Age: {demo.age}</span>}
+            {demo.gender && <span>Gender: {demo.gender}</span>}
             <span>LANG: {demo.primary_language || "en-US"}</span>
           </div>
         </div>

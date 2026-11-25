@@ -18,6 +18,7 @@ from PIL import Image
 from services.dialogue.schemas import (
     SkinCondition,
     ClinicalIntakeSlots,
+    IntakeFacts,
     ImagePrediction,
     ClinicalReasonerOutput,
     DifferentialDiagnosisItem
@@ -100,6 +101,8 @@ class MultimodalDermatologistAgent:
 - Duration: {intake.duration_days or 'Unspecified'} days
 - Itching: {'Yes' if intake.has_itching else 'No / Unspecified'}
 
+Known patient-reported facts: {json.dumps({k: getattr(intake, k) for k in IntakeFacts.model_fields if getattr(intake, k) is not None}, ensure_ascii=False)}
+Use these answers together with visible observations. Ask one relevant follow-up about something still unknown.
 Examine the skin photo and return JSON ONLY with this schema:
 {{
   "visual_morphology": "Description of morphological features observed in the image",

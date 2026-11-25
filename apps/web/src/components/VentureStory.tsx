@@ -23,8 +23,8 @@ const chapters = [
     ],
     presenter: 0,
   },
-  { id: "first-prototype", name: "The first build", title: "Start small. Learn from something real.", text: "Our first build explores one part of that journey: a conversation about a skin concern, supported by photographs and a structured case brief. It lets us test the interaction before building the full kiosk.", detail: "Available now: Hindi and English intake, photo capture, and a clinician review workflow. Clinical validation is still ahead.", presenter: 2 },
-  { id: "hospital-pilot", name: "The road ahead", title: "From a browser to the hospital floor.", text: "The next chapters are software refinement, kiosk and sensor integration, a complete kiosk prototype, and conversations with hospitals about pilots. Our proposed starting point is Varanasi and nearby districts in eastern Uttar Pradesh.", detail: "We’re looking to learn with clinicians, hospital teams, hardware collaborators, and pilot partners.", presenter: 0 },
+  { id: "first-prototype", name: "The first build", title: "Start small. Learn from something real.", text: "Our first build explores one part of that journey: a conversation about a skin concern, supported by photographs and a structured case brief. It lets us test the interaction before building the full kiosk.", detail: "Available now: Hindi and English intake, photo capture, and a clinician review workflow. Clinical validation is still ahead.", presenter: 1 },
+  { id: "hospital-pilot", name: "The road ahead", title: "From a browser to the hospital floor.", text: "The next chapters are software refinement, kiosk and sensor integration, a complete kiosk prototype, and conversations with hospitals about pilots. Our proposed starting point is Varanasi and nearby districts in eastern Uttar Pradesh.", detail: "We’re looking to learn with clinicians, hospital teams, hardware collaborators, and pilot partners.", presenter: 2 },
 ];
 
 export function VentureStory() {

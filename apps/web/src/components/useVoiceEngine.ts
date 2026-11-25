@@ -1,403 +1,122 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-/**
- * useVoiceEngine — Dual-Engine Voice Capture:
- * 1. Primary: Browser Web Speech API (`SpeechRecognition`) for instant live transcription.
- *    - Continuous resilience: auto-recovers from Chrome "no-speech" and spontaneous `onend` events.
- *    - Adaptive pause detection: 3.2s-4.2s natural pause threshold so users aren't cut off mid-thought.
- * 2. Secondary: MediaRecorder WAV/WebM recording sent to Sarvam AI STT (`saaras:v3`)
- *    if the browser STT doesn't return text or is blocked.
- * 3. AnalyserNode metering for real-time reactive orb visualizer.
- */
-
-export interface VoiceEngineState {
-  isListening: boolean;
-  audioLevel: number; // 0-1 normalized RMS from AnalyserNode
-  interimTranscript: string;
-  permissionError: string | null;
-  startListening: () => void;
-  stopListening: () => void;
-  toggleListening: () => void;
+interface Capture {
+  stream: MediaStream;
+  recorder: MediaRecorder;
+  context?: AudioContext;
+  frame?: number;
 }
 
-interface UseVoiceEngineOptions {
+function release(capture: Capture) {
+  if (capture.frame !== undefined) cancelAnimationFrame(capture.frame);
+  capture.stream.getTracks().forEach(track => track.stop());
+  if (capture.context) void capture.context.close().catch(() => {});
+}
+
+export function useVoiceEngine({ onFinalTranscript }: {
   onFinalTranscript: (text: string, audioBase64?: string) => void;
-  language?: string;
-}
-
-export function useVoiceEngine({ onFinalTranscript, language = "en-IN" }: UseVoiceEngineOptions): VoiceEngineState {
+}) {
   const [isListening, setIsListening] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [interimTranscript, setInterimTranscript] = useState("");
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const active = useRef<Capture | null>(null);
+  const busy = useRef(false);
+  const generation = useRef(0);
+  const submit = useRef(onFinalTranscript);
+  useEffect(() => { submit.current = onFinalTranscript; }, [onFinalTranscript]);
 
-  const langRef = useRef<string>(language);
-  useEffect(() => {
-    langRef.current = language;
-  }, [language]);
-
-  const isListeningRef = useRef<boolean>(false);
-  const startingRef = useRef(false);
-  const recognitionPrefixRef = useRef("");
-  const manualStopRef = useRef<boolean>(false);
-
-  const recognitionRef = useRef<any>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const rafRef = useRef<number>(0);
-  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
-
-  // Audio Recorder for Sarvam STT fallback
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-
-  // Track latest speech buffer and silence timer
-  const latestSpeechRef = useRef<string>("");
-  const silenceTimerRef = useRef<any>(null);
-  const isFlushedRef = useRef<boolean>(false);
-
-  // Always keep latest callback ref
-  const onFinalTranscriptRef = useRef(onFinalTranscript);
-  useEffect(() => {
-    onFinalTranscriptRef.current = onFinalTranscript;
-  }, [onFinalTranscript]);
-
-  // ── Convert Blob to Base64 helper ──
-  const blobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = (reader.result as string).split(",")[1];
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
-  // ── Flush speech buffer upstream ──
-  const flushTranscript = useCallback(async () => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
+  const cancelListening = useCallback(() => {
+    generation.current++;
+    busy.current = false;
+    const capture = active.current;
+    active.current = null;
+    if (capture) {
+      if (capture.recorder.state !== "inactive") capture.recorder.stop();
+      release(capture);
     }
-
-    if (isFlushedRef.current) return;
-
-    const textToSubmit = latestSpeechRef.current.trim();
-
-    // Check if we also recorded audio chunks
-    let recordedBase64 = "";
-    if (audioChunksRef.current.length > 0) {
-      try {
-        const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (audioBlob.size > 2000) {
-          recordedBase64 = await blobToBase64(audioBlob);
-        }
-      } catch (err) {
-        console.warn("[useVoiceEngine] Blob encoding error:", err);
-      }
-    }
-
-    // Only submit if we have actual recognized speech, or if browser lacks Web Speech API and has raw audio
-    const hasBrowserSTT =
-      typeof window !== "undefined" &&
-      Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
-    if (textToSubmit) {
-      isFlushedRef.current = true;
-      console.log("[useVoiceEngine] Submitting turn -> Text:", textToSubmit, "Audio size:", recordedBase64.length);
-      onFinalTranscriptRef.current(textToSubmit, recordedBase64 || undefined);
-    } else if (recordedBase64 && recordedBase64.length > 3000) {
-      isFlushedRef.current = true;
-      console.log("[useVoiceEngine] Submitting audio fallback turn -> Audio size:", recordedBase64.length);
-      onFinalTranscriptRef.current("", recordedBase64);
-    }
-    latestSpeechRef.current = "";
-    setInterimTranscript("");
-    audioChunksRef.current = [];
-  }, []);
-
-  // ── Meter loop: sample AnalyserNode and push audioLevel ──
-  const meterLoop = useCallback(() => {
-    if (!analyserRef.current || !dataArrayRef.current) return;
-    analyserRef.current.getByteTimeDomainData(dataArrayRef.current);
-    const data = dataArrayRef.current;
-
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) {
-      const v = (data[i] - 128) / 128;
-      sum += v * v;
-    }
-    const rms = Math.sqrt(sum / data.length);
-    const scaled = Math.min(1, rms * 3.5);
-    setAudioLevel(scaled);
-
-    rafRef.current = requestAnimationFrame(meterLoop);
-  }, []);
-
-  // ── Tear down audio pipeline ──
-  const teardownAudio = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
-    }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (_) {}
-      mediaRecorderRef.current = null;
-    }
-
-    if (sourceRef.current) {
-      try { sourceRef.current.disconnect(); } catch (_) {}
-      sourceRef.current = null;
-    }
-    if (analyserRef.current) {
-      try { analyserRef.current.disconnect(); } catch (_) {}
-      analyserRef.current = null;
-    }
-    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    dataArrayRef.current = null;
+    setIsListening(false);
     setAudioLevel(0);
   }, []);
 
-  // ── Stop listening ──
-  const stopListening = useCallback(async () => {
-    manualStopRef.current = true;
-    isListeningRef.current = false;
-    setIsListening(false);
+  useEffect(() => cancelListening, [cancelListening]);
 
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
+  const stopListening = () => {
+    const recorder = active.current?.recorder;
+    if (recorder?.state === "recording") recorder.stop();
+  };
 
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (_) {}
-      recognitionRef.current = null;
-    }
-    const recorder = mediaRecorderRef.current;
-    if (recorder && recorder.state !== "inactive") {
-      await new Promise<void>((resolve) => {
-        recorder.addEventListener("stop", () => resolve(), { once: true });
-        recorder.stop();
-      });
-    }
-    await flushTranscript();
-    teardownAudio();
-  }, [flushTranscript, teardownAudio]);
-
-  // ── Start listening ──
-  const startListening = useCallback(async () => {
-    if (isListeningRef.current || startingRef.current) return;
-    startingRef.current = true;
-    recognitionPrefixRef.current = "";
-    manualStopRef.current = false;
+  const startListening = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    const token = ++generation.current;
     setPermissionError(null);
-    latestSpeechRef.current = "";
-    isFlushedRef.current = false;
-    setInterimTranscript("");
-    audioChunksRef.current = [];
-
-    // 1. Acquire microphone stream
-    let stream: MediaStream;
+    let stream: MediaStream | undefined;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err: any) {
-      startingRef.current = false;
-      setPermissionError(
-        err.name === "NotAllowedError" || err.name === "PermissionDeniedError"
-          ? "Microphone access denied. Please allow microphone permissions in your browser bar."
-          : "Unable to access microphone on this device."
-      );
-      isListeningRef.current = false;
-      setIsListening(false);
-      return;
-    }
-    startingRef.current = false;
-    streamRef.current = stream;
-
-    // 2. Build Web Audio pipeline for visual meter
-    try {
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.6;
-      analyserRef.current = analyser;
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      sourceRef.current = source;
-      dataArrayRef.current = new Uint8Array(analyser.fftSize);
-      rafRef.current = requestAnimationFrame(meterLoop);
-    } catch (_) {}
-
-    // 3. Start MediaRecorder as backup audio stream
-    try {
-      const mime = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : MediaRecorder.isTypeSupported("audio/mp4")
-        ? "audio/mp4"
-        : "";
-      const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-      mr.start(250);
-      mediaRecorderRef.current = mr;
-    } catch (err) {
-      console.warn("[useVoiceEngine] MediaRecorder init failed:", err);
-    }
-
-    // 4. Start Speech Recognition
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = langRef.current || "en-IN";
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        console.log("[useVoiceEngine] SpeechRecognition onstart");
-        isListeningRef.current = true;
-        setIsListening(true);
-        isFlushedRef.current = false;
-      };
-
-      recognition.onresult = (event: any) => {
-        let finalAccum = "";
-        let interim = "";
-
-        // Iterate through all results to build full transcript seamlessly
-        for (let i = 0; i < event.results.length; i++) {
-          const transcriptPart = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalAccum += transcriptPart + " ";
-          } else {
-            interim += transcriptPart;
-          }
-        }
-
-        const activeText = (recognitionPrefixRef.current + " " + finalAccum + interim).trim();
-        if (activeText) {
-          latestSpeechRef.current = activeText;
-          setInterimTranscript(activeText);
-
-          // Clear any previous pause timer
-          if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = null;
-          }
-
-          // Dynamic natural pause detection:
-          // Give users 3.2s of silence if > 2 words, or 4.2s for short hesitations.
-          // This completely prevents cutting the user off mid-sentence while they think!
-          const wordCount = activeText.split(/\s+/).filter(Boolean).length;
-          const hesitant = /(?:um|uh|and|but|because|और|लेकिन|मतलब)[,. ]*$/i.test(activeText);
-          const pauseThreshold = hesitant || wordCount < 3 ? 5200 : 3200;
-
-          silenceTimerRef.current = setTimeout(() => {
-            console.log(`[useVoiceEngine] Auto-flushing on natural pause (${pauseThreshold}ms)`);
-            stopListening();
-          }, pauseThreshold);
-        }
-      };
-
-      recognition.onerror = (e: any) => {
-        console.warn("[useVoiceEngine] Web Speech API error:", e.error);
-        if (e.error === "no-speech") {
-          // Chrome triggers no-speech if silence detected before user starts talking.
-          // Do NOT shut down! Keep listening.
-          return;
-        }
-        if (e.error === "audio-capture") {
-          setPermissionError("No microphone detected. Please check your audio inputs.");
-          stopListening();
-          return;
-        }
-        if (e.error === "not-allowed" || e.error === "permission-denied") {
-          setPermissionError("Microphone access denied. Please allow microphone permission in the address bar.");
-          stopListening();
-          return;
-        }
-      };
-
-      recognition.onend = () => {
-        console.log("[useVoiceEngine] SpeechRecognition onend. isListening:", isListeningRef.current, "manualStop:", manualStopRef.current);
-        // If Chrome stopped recognition spontaneously (e.g. after interim silence),
-        // and user has NOT stopped listening or flushed, restart it immediately!
-        if (isListeningRef.current && !manualStopRef.current && !isFlushedRef.current) {
-          console.log("[useVoiceEngine] Restarting recognition stream to prevent premature cutoff...");
-          try {
-            recognitionPrefixRef.current = latestSpeechRef.current;
-            recognition.start();
-          } catch (err) {
-            console.warn("[useVoiceEngine] Could not restart recognition:", err);
-          }
-        }
-      };
-
-      recognitionRef.current = recognition;
-
-      try {
-        isListeningRef.current = true;
-        setIsListening(true);
-        recognition.start();
-      } catch (err) {
-        console.warn("[useVoiceEngine] SpeechRecognition start error:", err);
+      if (generation.current !== token) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
       }
-    } else {
-      console.warn("[useVoiceEngine] Browser SpeechRecognition not present; using MediaRecorder Sarvam fallback.");
-      isListeningRef.current = true;
+      const recorder = new MediaRecorder(stream);
+      const capture: Capture = { stream, recorder };
+      active.current = capture;
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = event => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        if (generation.current !== token) return;
+        cancelListening();
+        setPermissionError("Microphone recording failed. Please start recording again.");
+      };
+      stream.getAudioTracks()[0].onended = () => {
+        if (generation.current !== token || recorder.state !== "recording") return;
+        cancelListening();
+        setPermissionError("The microphone disconnected during recording.");
+      };
+      recorder.onstop = () => {
+        if (generation.current !== token) return;
+        active.current = null;
+        release(capture);
+        setIsListening(false);
+        setAudioLevel(0);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (generation.current !== token) return;
+          busy.current = false;
+          const encoded = typeof reader.result === "string" && reader.result.split(",")[1];
+          if (encoded) submit.current("", encoded);
+          else setPermissionError("No microphone audio was captured.");
+        };
+        reader.readAsDataURL(new Blob(chunks, { type: recorder.mimeType }));
+      };
+      recorder.start(250);
       setIsListening(true);
+      // The level meter is visual only. Recording ends when the patient presses Finish.
+      try {
+        const context = new AudioContext();
+        capture.context = context;
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 512;
+        context.createMediaStreamSource(stream).connect(analyser);
+        const samples = new Uint8Array(analyser.fftSize);
+        const meter = () => {
+          analyser.getByteTimeDomainData(samples);
+          const energy = samples.reduce((sum, n) => sum + ((n - 128) / 128) ** 2, 0);
+          setAudioLevel(Math.min(1, 3.5 * Math.sqrt(energy / samples.length)));
+          capture.frame = requestAnimationFrame(meter);
+        };
+        meter();
+      } catch { /* Recording also works without an audio meter. */ }
+    } catch (error) {
+      stream?.getTracks().forEach(track => track.stop());
+      if (generation.current !== token) return;
+      cancelListening();
+      setPermissionError(error instanceof DOMException && error.name === "NotAllowedError"
+        ? "Microphone permission was denied. Allow microphone access in your browser."
+        : "Could not start recording from this microphone.");
     }
-  }, [meterLoop, teardownAudio, stopListening]);
-
-  // ── Toggle ──
-  const toggleListening = useCallback(() => {
-    if (isListeningRef.current) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }, [startListening, stopListening]);
-
-  // ── Cleanup on unmount ──
-  useEffect(() => {
-    return () => {
-      manualStopRef.current = true;
-      isListeningRef.current = false;
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch (_) {}
-      }
-      teardownAudio();
-    };
-  }, [teardownAudio]);
-
-  return {
-    isListening,
-    audioLevel,
-    interimTranscript,
-    permissionError,
-    startListening,
-    stopListening,
-    toggleListening,
   };
+
+  return { isListening, audioLevel, permissionError, startListening, stopListening, cancelListening };
 }

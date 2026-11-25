@@ -74,13 +74,14 @@ def test_real_session_no_answers_advance_without_clarification_loop():
     assert slots.has_itching is True
     assert slots.has_fever is False
     assert slots.safety_screen_complete is True
-    assert slots.last_question_field == "has_pain"
+    assert slots.is_ready_for_photo
+    assert "has_pain" in slots.missing_required_slots
     assert slots.pending_clarifications == []
 
 
 def test_existing_corrupted_session_recovers_without_erasing_history():
     dm = DialogueManager(llm_adapter=ConfusedLLM())
-    slots = ClinicalIntakeSlots(primary_language="en-IN", body_site="legs", duration_days=5,
+    slots = ClinicalIntakeSlots(primary_language="en-IN", photo_declined=True, body_site="legs", duration_days=5,
         has_itching=True, has_fever=False, safety_screen_complete=True,
         last_question_field="lesion_type", pending_clarifications=list(FACTS)[:15])
     slots, msg, _, _ = dm.process_turn(slots, "on thigh near pubic area")
@@ -109,7 +110,7 @@ def test_itching_answer_does_not_invalidate_location_or_deny_pain():
                     "ambiguous_fields": ["body_site"],
                     "ambiguity_evidence": {"body_site": "it"}}
     dm = DialogueManager(llm_adapter=MisinterpretingLLM())
-    slots = ClinicalIntakeSlots(primary_language="en-IN", body_site="legs", duration_days=5,
+    slots = ClinicalIntakeSlots(primary_language="en-IN", photo_declined=True, body_site="legs", duration_days=5,
         has_fever=False, has_itching=True, safety_screen_complete=True, last_question_field="has_pain")
     slots, msg, _, _ = dm.process_turn(slots, "it itches")
     assert slots.body_site == "legs"
@@ -120,7 +121,7 @@ def test_itching_answer_does_not_invalidate_location_or_deny_pain():
 
 def test_spurious_known_location_clarification_can_recover():
     dm = DialogueManager(llm_adapter=OfflineLLM())
-    slots = ClinicalIntakeSlots(primary_language="en-IN", body_site="legs", duration_days=5,
+    slots = ClinicalIntakeSlots(primary_language="en-IN", photo_declined=True, body_site="legs", duration_days=5,
         has_fever=False, has_itching=True, safety_screen_complete=True,
         pending_clarifications=["body_site"], last_question_field="body_site")
     slots, _, _, _ = dm.process_turn(slots, "it itches")
@@ -130,7 +131,7 @@ def test_spurious_known_location_clarification_can_recover():
 
 def test_previous_inferred_no_pain_is_repaired_from_provenance():
     dm = DialogueManager(llm_adapter=OfflineLLM())
-    slots = ClinicalIntakeSlots(primary_language="en-IN", body_site="legs", duration_days=5,
+    slots = ClinicalIntakeSlots(primary_language="en-IN", photo_declined=True, body_site="legs", duration_days=5,
         has_fever=False, has_itching=True, has_pain=False, safety_screen_complete=True,
         pending_clarifications=["body_site"], last_question_field="body_site",
         fact_history=[{"field": "has_pain", "value": False, "previous": None, "transcript": "it itches"}])
